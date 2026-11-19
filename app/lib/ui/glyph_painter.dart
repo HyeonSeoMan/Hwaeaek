@@ -1,14 +1,14 @@
 import 'package:flutter/rendering.dart';
 
-import '../font/glyph.dart';
-import 'font_session.dart';
+import '../domain/font/metrics.dart';
+import '../domain/glyph/glyph.dart';
 
 /// 폰트 단위 윤곽선을 [side] 크기 정사각형 캔버스 좌표의 Path로 바꾼다.
 /// 캔버스는 y = ascender(위)부터 descender(아래)까지 1000 단위를 담는다.
 Path outlineToPath(GlyphOutline outline, double side) {
   final s = side / 1000;
   Offset map(GlyphPoint p) =>
-      Offset(p.x * s, (FontSession.ascender - p.y) * s);
+      Offset(p.x * s, (FontMetrics.ascender - p.y) * s);
   Offset mid(GlyphPoint a, GlyphPoint b) => (map(a) + map(b)) / 2;
 
   final path = Path()..fillType = PathFillType.nonZero;

@@ -67,7 +67,7 @@ UI      app/lib/ui       화면, 위젯, 내비게이션
 | `app/lib/domain/glyph/` | `GlyphPoint`, `GlyphOutline`, `Bounds`, HWO1 직렬화 | `app/lib/font/glyph.dart` (PoC 경로 변경) + 직렬화 (신규) |
 | `app/lib/domain/ink/` | `InkPoint`, `InkStroke`, `PenStyle`, 획 → 윤곽선, 단순화, HWS1 직렬화 | `app/lib/ink/ink.dart` (PoC 변경: `t`·기울기 추가, 펜 옵션 명시) |
 | `app/lib/domain/hangul/` | 자모 표, 음절 분해, 한글 정규화, 빈도 순서 | `app/lib/hangul/hangul.dart` (PoC 경로 변경) + 정규화·빈도 (신규) |
-| `app/lib/domain/compose/` | 조합 엔진, 레이아웃, 의존 집합, 캐시 | `app/lib/hangul/composer.dart` (PoC 변경: 입력을 획 전용으로, `CompositionRule`·PoC `BaseGlyph` 제거, `dependencies` 추가) |
+| `app/lib/domain/compose/` | 조합 엔진(`dependencies` 포함), 레이아웃, 캐시 | `app/lib/hangul/composer.dart` (PoC 변경: 입력을 획 전용으로, `CompositionRule`·PoC `BaseGlyph` 제거, `dependencies` 추가) |
 | `app/lib/domain/font/` | 폰트 메트릭 상수, `FontMetadata`, TTF 빌더, TTF 리더 | `app/lib/font/ttf_writer.dart` (PoC 변경: 메트릭 기본값, `created` 필수) + 리더 (신규) |
 | `app/lib/domain/project/` | 스냅샷, 유효 글리프, 불변식 검사 | `app/lib/app/font_session.dart`에서 분리 |
 | `app/lib/infra/db/` | Drift 테이블, DAO, 마이그레이션 | (신규) |
@@ -77,7 +77,7 @@ UI      app/lib/ui       화면, 위젯, 내비게이션
 | `app/lib/ui/` | 화면, `GlyphPainter`(2차 곡선 렌더러) | `app/lib/app/*` 재작성, `glyph_painter.dart` (PoC 경로 변경) |
 | `app/lib/main.dart` | 릴리스 진입점. `dev/`를 가져오지 않는다 | (PoC 변경) |
 | `app/lib/main_dev.dart` | 개발 진입점. 픽스처, 규칙 비교 메뉴 | (신규) |
-| `app/lib/dev/` | 개발용 픽스처, v0 비교 경로 | (PoC 동작 유지) |
+| `app/lib/dev/` | 개발용 획 픽스처 | (PoC 변경: v0 경로·나눔 펜 로더 삭제) |
 | `app/assets/frequency/` | 빈도 순서 자산(§14) | (신규) |
 | `tools/` | 검증·렌더링·픽스처·KS X 1001 생성 스크립트 | (PoC 동작 유지) + `make_ksx1001.py` (신규) |
 
@@ -395,7 +395,7 @@ HangulComposer(Map<String, List<InkStroke>> baseStrokes)   // 역할 키 → 획
   dependencies(int cp) -> Set<String>    // 이 글자 조합에 영향을 주는 역할 키
 ```
 
-- 입력은 기본 글리프 획이다(FR-04). PoC의 윤곽선 입력(규칙 v0)은 `app/lib/dev/`의 비교용 코드로만 남긴다.
+- 입력은 기본 글리프 획이다(FR-04). PoC의 윤곽선 입력(규칙 v0)은 삭제했다(git 이력 `582ba4c`에 있음).
 - `dependencies(cp)`는 OQ-01 산출물("음절 → 의존 기본 글리프 집합 함수")이자 TS-01의 기대 집합 정의다. 겹자음 자리에는 그 겹자음 키와 구성 자음 키를 **둘 다** 넣는다(겹자음 기본 글리프가 생기면 레이아웃도 바뀌기 때문).
 
 ### 6.2 규칙 v1 (PoC 변경: 컨투어 순서, 단독 자모 펜, 오류 판정, 퇴화 범위)
@@ -824,16 +824,16 @@ Riverpod 3, 코드 생성 없이 `Provider`/`NotifierProvider`/`StreamProvider`�
 | `app/lib/font/ttf_writer.dart` | `app/lib/domain/font/`로 이동. `created` 필수, 메트릭 기본값을 §2 상수로, u16 범위 검사 | 1 |
 | `app/lib/ink/ink.dart` | `app/lib/domain/ink/`로 이동. `InkPoint` 확장, `PenStyle` 전체 옵션 | 1 |
 | `app/lib/hangul/hangul.dart` | `app/lib/domain/hangul/`로 이동 | 1 |
-| `app/lib/hangul/composer.dart` | `app/lib/domain/compose/`로 이동. 획 입력 전용, `ComposerMetrics`는 `RuleV1Params`(규칙 v1 상수 묶음, `ruleVersion`의 일부)로 이름을 바꿔 남김, `dependencies` 추가. v0 경로와 PoC `BaseGlyph`는 `app/lib/dev/compose_v0.dart`로 | 1 |
+| `app/lib/hangul/composer.dart` | `app/lib/domain/compose/`로 이동. 획 입력 전용, `ComposerMetrics`는 `RuleV1Params`(규칙 v1 상수 묶음, `ruleVersion`의 일부)로 이름을 바꿔 남김, `dependencies`는 정적 메서드로 추가. v0 경로와 PoC `BaseGlyph`는 삭제 | 1 |
 | `app/lib/app/*` (font_session, memo_screen, base_glyph_screen, glyph_editor_screen) | 단계 1에서 삭제. 단계 4에서 §10 기준으로 새로 작성 | 1 |
 | `app/lib/app/glyph_painter.dart` | `app/lib/ui/glyph_painter.dart`로 이동 | 1 |
 | `app/lib/main.dart` | 단계 1에서 빈 화면 진입점으로 줄임. 단계 4에서 릴리스 진입점 작성 | 1, 4 |
-| `app/lib/dev/fixture_glyphs.dart` | `parseJamoFixture`를 v0 `BaseGlyph`(compose_v0)용으로 수정 | 1 |
+| `app/lib/dev/fixture_glyphs.dart` | 삭제(나눔 펜 픽스처는 v0 전용) | 1 |
 | `app/lib/dev/stroke_fixture.dart` | 양자화·`t` 추가 | 1 |
 | `app/test/font/ttf_writer_test.dart` | 새 경로로 import 수정, `created` 인자 | 1 |
-| `app/test/hangul/composer_test.dart` | 획 픽스처 + 규칙 v1로 다시 작성. v0 비교는 `app/test/dev/compose_v0_test.dart`로 | 1 |
+| `app/test/hangul/composer_test.dart` | `app/test/domain/compose/`로 옮겨 획 픽스처 + 규칙 v1로 다시 작성 | 1 |
 | `app/test/hangul/pen_scale_experiment_test.dart` | `app/test/dev/`로 옮기고 `RuleV1Params`를 쓰도록 수정 | 1 |
-| `app/assets/dev/*`(OFL.txt 포함) | 유지. `pubspec.yaml` assets에서 뺀다 | 1 |
+| `app/assets/dev/*`(OFL.txt 포함) | 참고용으로 유지(코드에서 쓰지 않음). `pubspec.yaml` assets에서 뺀다 | 1 |
 | `tools/*.py` | 유지 | — |
 | `material_ui` 패키지 | Flutter 3.50 기본 Material 패키지이므로 유지 | — |
 
@@ -947,7 +947,7 @@ Riverpod 3, 코드 생성 없이 `Provider`/`NotifierProvider`/`StreamProvider`�
 
 | 단계 | 만들 파일 | 고칠·옮길 파일 | 지울 파일 | 통과 기준 |
 | --- | --- | --- | --- | --- |
-| 1 도메인 | `domain/font/metrics.dart`, `domain/font/ttf_reader.dart`, `domain/glyph/hwo1.dart`, `domain/ink/hws1.dart`, `domain/ink/quantize.dart`, `domain/hangul/normalize.dart`, `domain/compose/dependencies.dart`, `dev/compose_v0.dart`, `test/golden/compose_v1.sha256`, `test/domain/**`, `tools/check_dev_imports.sh` | §15 단계 1 행 전부, `pubspec.yaml`(perfect_freehand·crypto 고정, dev 자산 제거) | `lib/app/font_session.dart`, `lib/app/*_screen.dart` | 단위, 해시 골든(TS-12) |
+| 1 도메인 | `domain/font/metrics.dart`, `domain/font/ttf_reader.dart`, `domain/glyph/hwo1.dart`, `domain/ink/hws1.dart`, `domain/ink/quantize.dart`, `domain/hangul/normalize.dart`, `domain/decode_error.dart`, `test/golden/compose_v1.sha256`, `test/domain/**`, `test/support/tools.dart`, `tools/check_dev_imports.sh` | §15 단계 1 행 전부, `pubspec.yaml`(perfect_freehand·crypto 고정, dev 자산 제거) | `lib/app/*`, `lib/dev/fixture_glyphs.dart` | 단위, 해시 골든(TS-12) — 완료 |
 | 2 저장소 | `infra/db/schema.drift`, `infra/db/database.dart`(+ 생성 파일), `infra/db/*_dao.dart`, `state/pending_writes.dart`, `test/infra/db/**`, `test/fixtures/db/v1.sqlite`, `test/support/failing_executor.dart` | `pubspec.yaml`(drift, uuid) | — | TS-01, TS-02, TS-04, TS-06, TS-07, TS-15, TS-16, TS-20 |
 | 3 상태 | `state/snapshot.dart`, `state/composer_provider.dart`, `state/undo.dart`, `test/state/**` | `pubspec.yaml`(flutter_riverpod) | — | TS-05 |
 | 4 화면 | `ui/**`, `infra/platform/dynamic_font.dart`, `main.dart`, `main_dev.dart`, `test/ui/**` | `ui/glyph_painter.dart` | — | TS-09, TS-10, TS-11, TS-19 |

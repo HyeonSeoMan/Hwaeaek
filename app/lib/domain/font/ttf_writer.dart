@@ -1,6 +1,6 @@
 /// 순수 Dart TrueType(`glyf`) 폰트 작성기.
 ///
-/// tech-stack.md 3장 C안. 단순 글리프(composite 없음)만 쓰며, 모든 코드포인트는
+/// Spec §7.1, tech-stack.md 3장 C안. 단순 글리프(composite 없음)만 쓰며, 모든 코드포인트는
 /// BMP 안에 있다고 가정한다(한글 음절·호환 자모·ASCII).
 library;
 
@@ -8,7 +8,8 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
-import 'glyph.dart';
+import '../glyph/glyph.dart';
+import 'metrics.dart';
 
 class FontGlyph {
   const FontGlyph(this.outline, this.advanceWidth);
@@ -25,16 +26,15 @@ class FontSpec {
     this.styleName = 'Regular',
     this.versionMajor = 1,
     this.versionMinor = 0,
-    this.unitsPerEm = 1000,
-    this.ascender = 880,
-    this.descender = -120,
-    this.lineGap = 0,
+    required this.created,
+    this.unitsPerEm = FontMetrics.unitsPerEm,
+    this.ascender = FontMetrics.ascender,
+    this.descender = FontMetrics.descender,
+    this.lineGap = FontMetrics.lineGap,
     this.vendorId = 'HWAE',
     this.license = '',
     FontGlyph? notdef,
-    DateTime? created,
-  }) : notdef = notdef ?? _defaultNotdef(unitsPerEm, ascender),
-       created = created ?? DateTime.utc(2026);
+  }) : notdef = notdef ?? _defaultNotdef(unitsPerEm, ascender);
 
   /// 사용자에게 보이는 이름. 한글 가능.
   final String familyName;
@@ -54,6 +54,9 @@ class FontSpec {
   /// 코드포인트 → 글리프. 공백(U+0020)이 없으면 자동으로 추가한다.
   final Map<int, FontGlyph> glyphs;
   final FontGlyph notdef;
+
+  /// head.created/modified. 내보내기는 내보내기 시각, 메모 폰트는
+  /// [FontMetrics.fixedCreated].
   final DateTime created;
 
   String get versionString =>
@@ -88,7 +91,7 @@ Uint8List buildTtf(FontSpec spec) => _TtfBuilder(spec).build();
 class _TtfBuilder {
   _TtfBuilder(this.spec) {
     final map = Map<int, FontGlyph>.of(spec.glyphs);
-    map.putIfAbsent(0x20, () => FontGlyph(GlyphOutline.empty, spec.unitsPerEm ~/ 3));
+    map.putIfAbsent(0x20, () => const FontGlyph(GlyphOutline.empty, FontMetrics.spaceAdvance));
     codePoints = map.keys.toList()..sort();
     for (final cp in codePoints) {
       if (cp < 0 || cp > 0xFFFE) {
@@ -532,7 +535,8 @@ class _Writer {
   void u8(int v) => _b.addByte(v & 0xFF);
 
   void u16(int v) {
-    _tmp.setUint16(0, v & 0xFFFF);
+    if (v < 0 || v > 0xFFFF) throw RangeError.value(v, 'uint16');
+    _tmp.setUint16(0, v);
     _b.add(_tmp.buffer.asUint8List(0, 2).toList());
   }
 

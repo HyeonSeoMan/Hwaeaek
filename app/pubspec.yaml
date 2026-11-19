@@ -7,11 +7,12 @@ environment:
   sdk: ^3.14.0
 
 dependencies:
+  crypto: 3.0.8
   flutter:
     sdk: flutter
   material_ui: ^1.1.0
   path_provider: ^2.1.6
-  perfect_freehand: ^2.5.2+1
+  perfect_freehand: 2.5.2+1
   share_plus: ^13.3.1
 
 dev_dependencies:
@@ -21,5 +22,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  assets:
-    - assets/dev/nanum_pen_jamo.json

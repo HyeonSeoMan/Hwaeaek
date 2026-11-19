@@ -7,7 +7,8 @@ library;
 
 import 'dart:math' as math;
 
-import '../ink/ink.dart';
+import '../domain/ink/ink.dart';
+import '../domain/ink/quantize.dart';
 
 typedef _Line = List<(int, int)>;
 
@@ -191,6 +192,7 @@ final Map<String, List<_Line>> _jamo = {
 };
 
 /// 획 픽스처. 점을 촘촘하게 보간하고 손으로 쓴 듯한 결정적 흔들림을 더한다.
+/// 포인터 입력과 같게 f32로 양자화하고 `t` = 점 순번 × 8ms로 둔다(Spec §5).
 Map<String, List<InkStroke>> strokeFixture() {
   final rng = math.Random(7);
   return {
@@ -218,6 +220,7 @@ InkStroke _densify(_Line line, math.Random rng) {
   final dx = rng.nextDouble() * 20 - 10, dy = rng.nextDouble() * 20 - 10;
   final skew = rng.nextDouble() * 0.06 - 0.03;
   return InkStroke([
-    for (final p in out) InkPoint(p.x + dx + p.y * skew, p.y + dy),
+    for (final (i, p) in out.indexed)
+      quantizedPoint(p.x + dx + p.y * skew, p.y + dy, t: i * 8),
   ]);
 }

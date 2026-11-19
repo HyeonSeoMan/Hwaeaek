@@ -1,9 +1,10 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hwaeaek/dev/fixture_glyphs.dart';
-import 'package:hwaeaek/font/ttf_writer.dart';
-import 'package:hwaeaek/hangul/composer.dart';
+import 'package:hwaeaek/dev/stroke_fixture.dart';
+import 'package:hwaeaek/domain/compose/composer.dart';
+import 'package:hwaeaek/domain/font/metrics.dart';
+import 'package:hwaeaek/domain/font/ttf_writer.dart';
 
 /// 겹받침 뭉침 실험 (G0 3회차): 펜 조절 지수 k와 겹받침 자리 높이기 비교 이미지.
 void main() {
@@ -16,7 +17,7 @@ void main() {
   const configs = [(0.0, 0.0), (0.35, 0.0), (0.35, 0.06), (0.35, 0.1)];
 
   test('펜 조절 지수·겹받침 자리 비교 이미지', () async {
-    final base = strokeBaseGlyphs();
+    final base = strokeFixture();
     final cps = {for (final l in lines) ...l.runes.where((r) => r > 0x20)};
     final out = Directory('../build/poc')..createSync(recursive: true);
     final files = <String>[];
@@ -24,14 +25,13 @@ void main() {
       final name = 'k${(k * 100).round()}_r${(raise * 100).round()}';
       final composer = HangulComposer(
         base,
-        metrics: ComposerMetrics(penScaleExponent: k, compoundTailRaise: raise),
+        params: RuleV1Params(penScaleExponent: k, compoundTailRaise: raise),
       );
       final bytes = buildTtf(
         FontSpec(
           familyName: name,
           asciiFamilyName: name,
-          ascender: 800,
-          descender: -200,
+          created: FontMetrics.fixedCreated,
           glyphs: {for (final cp in cps) cp: FontGlyph(composer.compose(cp)!, 1000)},
         ),
       );

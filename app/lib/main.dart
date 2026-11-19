@@ -1,26 +1,11 @@
 import 'package:material_ui/material_ui.dart';
 
-import 'app/font_session.dart';
-import 'app/memo_screen.dart';
-import 'dev/fixture_glyphs.dart';
-
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  // PoC: 사용자 손글씨 대신 개발용 획 픽스처로 시작한다.
-  runApp(HwaeaekApp(session: FontSession(strokeBaseGlyphs())));
-}
-
-class HwaeaekApp extends StatelessWidget {
-  const HwaeaekApp({super.key, required this.session});
-
-  final FontSession session;
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
+/// 구현 단계 1: 도메인만 있는 상태. 화면은 단계 4에서 작성한다(Spec §20).
+void main() {
+  runApp(
+    const MaterialApp(
       title: '회애액',
-      theme: ThemeData(colorSchemeSeed: const Color(0xFF3B6E5A)),
-      home: MemoScreen(session: session),
-    );
-  }
+      home: Scaffold(body: Center(child: Text('회애액'))),
+    ),
+  );
 }
