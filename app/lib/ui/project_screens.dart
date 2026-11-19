@@ -16,6 +16,7 @@ import '../state/projects.dart';
 import '../state/providers.dart';
 import '../state/snapshot.dart';
 import 'base_glyph_screen.dart';
+import 'export_screen.dart';
 import 'memo_screen.dart';
 
 Future<String?> _askName(
@@ -214,6 +215,18 @@ class _ProjectHomeScreenState extends ConsumerState<ProjectHomeScreen> {
               ),
             ),
           ),
+          if (unlocked)
+            IconButton(
+              tooltip: 'TTF 내보내기',
+              icon: const Icon(Icons.ios_share),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  fullscreenDialog: true,
+                  builder: (_) => ExportScreen(projectId: _id),
+                ),
+              ),
+            ),
           IconButton(
             tooltip: '설정',
             icon: const Icon(Icons.settings_outlined),
