@@ -10,6 +10,7 @@ import '../domain/font/naming.dart';
 import '../domain/hangul/base_set.dart';
 import '../infra/db/database.dart';
 import '../infra/db/memo_dao.dart';
+import '../state/backup_actions.dart';
 import '../state/glyph_actions.dart';
 import '../state/pending_writes.dart';
 import '../state/projects.dart';
@@ -57,7 +58,30 @@ class ProjectListScreen extends ConsumerWidget {
     final projects = ref.watch(projectListProvider);
     final dao = ref.read(projectDaoProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('회애액')),
+      appBar: AppBar(
+        title: const Text('회애액'),
+        actions: [
+          IconButton(
+            tooltip: '백업 가져오기',
+            icon: const Icon(Icons.file_open_outlined),
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              try {
+                final id = await ref
+                    .read(backupActionsProvider)
+                    .pickAndImport();
+                if (id == null) return;
+                messenger.showSnackBar(
+                  const SnackBar(content: Text('새 프로젝트로 가져왔습니다')),
+                );
+                if (context.mounted) openProject(context, id);
+              } on BackupMessage catch (e) {
+                messenger.showSnackBar(SnackBar(content: Text(e.message)));
+              }
+            },
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           final name = await _askName(context, title: '새 폰트 프로젝트');
@@ -316,6 +340,19 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
   final _form = GlobalKey<FormState>();
   var _finger = false;
   var _loaded = false;
+  var _backingUp = false;
+
+  Future<void> _backup() async {
+    setState(() => _backingUp = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(backupActionsProvider).createAndSave(widget.projectId);
+    } on BackupMessage catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _backingUp = false);
+    }
+  }
 
   @override
   void initState() {
@@ -401,6 +438,23 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
                         .read(settingsDaoProvider)
                         .setBool(SettingsDao.drawWithFinger, v);
                   },
+                ),
+                const SizedBox(height: 24),
+                Text('백업', style: Theme.of(context).textTheme.titleSmall),
+                const Text(
+                  '기본 글리프, 내 글씨와 수정 이력, 메모를 파일 하나로 저장합니다. '
+                  '앱을 지우거나 기기를 바꿀 때 이 파일로 되살릴 수 있습니다.',
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  icon: _backingUp
+                      ? const SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.backup_outlined),
+                  label: const Text('백업 만들기'),
+                  onPressed: _backingUp ? null : _backup,
                 ),
               ],
             ),

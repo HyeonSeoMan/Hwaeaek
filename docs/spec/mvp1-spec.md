@@ -741,7 +741,7 @@ Riverpod 3, 코드 생성 없이 `Provider`/`NotifierProvider`/`StreamProvider`�
 
 1. 파일 선택(§13.2)으로 경로를 받는다.
 2. 중앙 디렉터리만 읽는다(`InputFileStream`). 중앙 디렉터리 크기 ≤ 64MB. 이름이 §11.1 정규식 밖이거나, 중복 이름, 디렉터리·심볼릭 링크, 암호화, stored·deflate 외 방식이 있으면 거부한다.
-3. 선언된 압축 해제 크기의 합 × 2 ≤ 기기 여유 공간이어야 한다.
+3. Dart에는 여유 공간 조회 API가 없으므로, 디스크 부족은 가져오기 트랜잭션의 SQLITE_FULL로 감지해 `storage`로 알린다(쓰기는 모두 롤백) `[Spec 결정]`.
 4. 항목마다 따로 풀며, 실제로 나온 바이트를 세어 다음 상한을 넘는 순간 중단한다: `.hws` ≤ 512KB, `.hwo` ≤ 512KB, `manifest.json` ≤ 1MB, `custom/index.json`·`memos.json` ≤ 64MB. 또 항목별 압축률(해제 크기 / 압축 크기) ≤ 200.
 5. 의미 검증:
    - manifest 필수 필드와 타입. `formatVersion`, `schemaVersion`, `baseSetVersion`이 앱보다 크면 거부. `ruleVersion`은 거부 조건이 아니다(자동 생성은 앱 규칙으로 다시 계산).
@@ -953,7 +953,7 @@ Riverpod 3, 코드 생성 없이 `Provider`/`NotifierProvider`/`StreamProvider`�
 | 3 상태 | `domain/project/snapshot.dart`(스냅샷, 유효 글리프, LRU 캐시), `state/providers.dart`, `state/snapshot.dart`(스냅샷·렌더러 provider), `state/glyph_actions.dart`(쓰기 동작, 실행 취소), `test/state/glyph_state_test.dart` | `pubspec.yaml`(flutter_riverpod), `infra/db/glyph_dao.dart`(`GlyphSelection`을 도메인으로) | — | TS-01, TS-05 — 완료 |
 | 4 화면 | `ui/{app,project_screens,base_glyph_screen,glyph_editor_screen,memo_screen,memo_text,custom_glyph_flow}.dart`, `state/{memo_font,projects}.dart`, `infra/platform/dynamic_font.dart`, `main.dart`, `main_dev.dart`, `test/ui/memo_screen_test.dart` | `ui/glyph_painter.dart`, `domain/compose/composer.dart`(`guideSlotFor`) | — | TS-09, TS-10, TS-11, TS-19 — 완료. 빈도순 목록은 단계 7 |
 | 5 내보내기 | `domain/font/export.dart`(전체 계산·빌드·검증), `state/export_job.dart`(isolate 진행률, .part → 검증 → 커밋 → 이름 바꾸기, 최근 3개 보관), `infra/platform/files.dart`, `ui/export_screen.dart`, `test/state/export_job_test.dart`, `integration_test/app_flow_test.dart`, `.github/workflows/ci.yml` | `pubspec.yaml`(file_picker, integration_test), macOS 엔타이틀먼트(사용자 선택 파일 읽기·쓰기) | — | TS-03, TS-08, TS-13, TS-14 — 완료. TS-M1, TS-M2는 수동 |
-| 6 백업 | `infra/backup/**`, `test/infra/backup/**`, `test/fixtures/backup/**` | `pubspec.yaml`(archive) | — | TS-17, TS-18 |
+| 6 백업 | `infra/backup/backup.dart`(형식·만들기·검사·가져오기), `state/backup_actions.dart`, `app_info.dart`, `test/infra/backup_test.dart`(악성 파일은 테스트 안에서 만든다), `test/state/backup_actions_test.dart` | `pubspec.yaml`(archive), `infra/platform/files.dart`(백업 고르기), `ui/project_screens.dart`(가져오기·백업 만들기) | — | TS-17, TS-18 — 완료 |
 | 7 빈도 | `domain/hangul/frequency.dart`, `tools/make_ksx1001.py`, `assets/frequency/*.txt` | `pubspec.yaml`(assets) | — | 단위 |
 | 8 iOS 설치 `[G0 대기: OQ-09]` | `ios/Runner/FontInstaller.swift`, `infra/platform/font_installer.dart`, `android/app/src/main/res/xml/data_extraction_rules.xml` | `ios/Runner/Runner.entitlements`, `AndroidManifest.xml` | — | TS-M3, TS-M4 |
 

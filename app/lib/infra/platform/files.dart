@@ -52,3 +52,10 @@ Future<Directory> defaultExportsRoot() async {
   final docs = await getApplicationDocumentsDirectory();
   return Directory('${docs.path}/exports');
 }
+
+/// 백업 파일 고르기 (Spec §13.2). 취소하면 null.
+Future<File?> pickBackupFile() async {
+  final result = await FilePicker.pickFiles(dialogTitle: '가져올 백업 파일');
+  final path = result.singleOrNull?.path;
+  return path == null ? null : File(path);
+}
