@@ -1,0 +1,83 @@
+-- 회애액 저장소 스키마 v1 (Spec §4.1). 시각은 epoch ms.
+
+CREATE TABLE projects (
+  id TEXT NOT NULL PRIMARY KEY,
+  name TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  base_set_version INTEGER NOT NULL,
+  rule_version INTEGER NOT NULL,
+  memo_unlocked_at INTEGER,
+  glyph_revision INTEGER NOT NULL DEFAULT 0,
+  base_revision INTEGER NOT NULL DEFAULT 0,
+  font_family_name TEXT NOT NULL,
+  font_ascii_name TEXT NOT NULL,
+  font_style_name TEXT NOT NULL DEFAULT 'Regular',
+  font_version_minor INTEGER NOT NULL DEFAULT 0 CHECK (font_version_minor BETWEEN 0 AND 999),
+  font_license TEXT NOT NULL DEFAULT ''
+) AS ProjectRow;
+
+CREATE TABLE base_glyphs (
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  role_key TEXT NOT NULL,
+  strokes BLOB NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (project_id, role_key)
+) AS BaseGlyphRow;
+
+CREATE TABLE custom_revisions (
+  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  code_point INTEGER NOT NULL CHECK (code_point BETWEEN 44032 AND 55203),
+  strokes BLOB NOT NULL,
+  outline BLOB NOT NULL,
+  pen TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  UNIQUE (project_id, code_point, id)
+) AS CustomRevisionRow;
+
+CREATE INDEX custom_revisions_cp ON custom_revisions (project_id, code_point);
+
+CREATE TABLE custom_glyphs (
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  code_point INTEGER NOT NULL CHECK (code_point BETWEEN 44032 AND 55203),
+  selection TEXT NOT NULL CHECK (selection IN ('generated', 'custom')),
+  current_revision_id INTEGER NOT NULL,
+  PRIMARY KEY (project_id, code_point),
+  FOREIGN KEY (project_id, code_point, current_revision_id)
+    REFERENCES custom_revisions (project_id, code_point, id)
+) AS CustomGlyphRow;
+
+CREATE TABLE memos (
+  id TEXT NOT NULL PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  text TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+) AS MemoRow;
+
+CREATE TABLE drafts (
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('base', 'custom')),
+  "key" TEXT NOT NULL,
+  strokes BLOB NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (project_id, kind, "key")
+) AS DraftRow;
+
+CREATE TABLE app_settings (
+  "key" TEXT NOT NULL PRIMARY KEY,
+  value TEXT NOT NULL
+) AS AppSettingRow;
+
+-- 수정 이력 삭제를 허용된 두 경로로 제한한다(POL-01). 항상 한 행이다.
+CREATE TABLE revision_guard (
+  id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+  allow_revision_delete INTEGER NOT NULL CHECK (allow_revision_delete IN (0, 1))
+) AS RevisionGuardRow;
+
+CREATE TRIGGER custom_revisions_no_delete BEFORE DELETE ON custom_revisions
+WHEN NOT EXISTS (SELECT 1 FROM revision_guard WHERE id = 1 AND allow_revision_delete = 1)
+BEGIN
+  SELECT RAISE(ABORT, 'custom revision delete not allowed');
+END;

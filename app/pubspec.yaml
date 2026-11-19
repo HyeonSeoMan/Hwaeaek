@@ -8,17 +8,24 @@ environment:
 
 dependencies:
   crypto: 3.0.8
+  drift: 2.35.4
+  drift_flutter: 0.3.1
   flutter:
     sdk: flutter
   material_ui: ^1.1.0
   path_provider: ^2.1.6
   perfect_freehand: 2.5.2+1
   share_plus: ^13.3.1
+  sqlite3: 3.9.1
+  uuid: 4.6.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  drift_dev: 2.35.3
+  build_runner: 2.17.1
+  fake_async: ^1.3.3
 
 flutter:
   uses-material-design: true

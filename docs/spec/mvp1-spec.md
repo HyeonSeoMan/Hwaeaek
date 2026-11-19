@@ -259,20 +259,20 @@ CREATE TABLE app_settings (
 );
 
 -- 수정 이력 삭제를 허용된 두 경로로 제한한다(POL-01).
--- _guard는 항상 한 행이다. 행이 없거나 값이 1이 아니면 삭제를 막는다.
-CREATE TABLE _guard (
+-- revision_guard는 항상 한 행이다. 행이 없거나 값이 1이 아니면 삭제를 막는다.
+CREATE TABLE revision_guard (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   allow_revision_delete INTEGER NOT NULL CHECK (allow_revision_delete IN (0, 1))
 );
-INSERT INTO _guard VALUES (1, 0);
+INSERT INTO revision_guard VALUES (1, 0);  -- Drift onCreate에서 실행
 CREATE TRIGGER custom_revisions_no_delete BEFORE DELETE ON custom_revisions
-WHEN NOT EXISTS (SELECT 1 FROM _guard WHERE id = 1 AND allow_revision_delete = 1)
+WHEN NOT EXISTS (SELECT 1 FROM revision_guard WHERE id = 1 AND allow_revision_delete = 1)
 BEGIN SELECT RAISE(ABORT, 'custom revision delete not allowed'); END;
 ```
 
 - 모든 연결의 `beforeOpen`에서 `PRAGMA foreign_keys = ON`, `journal_mode = WAL`을 켠다.
 - `custom_glyphs`의 복합 외래 키가 "현재 수정본은 같은 프로젝트·같은 음절의 것"을 보장한다.
-- **수정 이력 삭제 경로는 둘뿐이다:** 커스텀 글리프 삭제 DAO와 프로젝트 삭제 DAO가 트랜잭션 안에서 `_guard.allow_revision_delete = 1`로 바꾸고 삭제한 뒤 0으로 돌린다. 다른 코드가 지우려 하면 트리거가 막는다.
+- **수정 이력 삭제 경로는 둘뿐이다:** 커스텀 글리프 삭제 DAO와 프로젝트 삭제 DAO가 트랜잭션 안에서 `revision_guard.allow_revision_delete = 1`로 바꾸고 삭제한 뒤 0으로 돌린다. 다른 코드가 지우려 하면 트리거가 막는다.
 - 메모 삭제는 즉시 행을 지운다. 실행 취소는 메모리에 보관한 행을 다시 넣는다(§9.2).
 - 스키마는 Drift `.drift` 파일(`app/lib/infra/db/schema.drift`)에 위 SQL로 쓴다. 복합 외래 키·트리거를 그대로 표현하기 위해서다 `[Spec 결정]`. `schemaVersion` = 1. 마이그레이션마다 이전 버전 DB 픽스처 테스트를 둔다.
 - `projects.updated_at`은 프로젝트 이름·메타데이터·글리프 쓰기 때 갱신한다. 메모 쓰기 때는 갱신하지 않는다.
@@ -767,11 +767,11 @@ Riverpod 3, 코드 생성 없이 `Provider`/`NotifierProvider`/`StreamProvider`�
 | --- | --- | --- | --- | --- |
 | 단위 | `flutter test` | 분해, 조합, `dependencies`, 점 하나 기본 글리프 → 조합 오류, HWS1/HWO1 왕복, 양자화 후 조합 동일, TTF 빌드·읽기, u16 초과 예외, 한글 정규화 벡터 | — | 1 |
 | 해시 골든 | `flutter test` | §6.3 | TS-12 | 1 |
-| 불변식·회귀 | `flutter test` + 임시 파일 Drift DB | POL-01~03, POL-05~07. 트리거가 허용 경로 밖 수정본 삭제를 막음, `_guard` 행이 없어도 막음, 다른 모든 쓰기 후 `custom_revisions` 행 수가 줄지 않음, `glyph_revision` 증가 | TS-01, TS-04, TS-06, TS-07, TS-20 | 2 |
+| 불변식·회귀 | `flutter test` + 임시 파일 Drift DB | POL-01~03, POL-05~07. 트리거가 허용 경로 밖 수정본 삭제를 막음, `revision_guard` 행이 없어도 막음, 다른 모든 쓰기 후 `custom_revisions` 행 수가 줄지 않음, `glyph_revision` 증가 | TS-01, TS-04, TS-06, TS-07, TS-20 | 2 |
 | 재시작 | 임시 파일 DB 닫고 다시 열기 | | TS-02 | 2 |
-| 오류 주입 | N번째 문에서 예외를 던지는 `QueryExecutor` 래퍼, `PRAGMA max_page_count` | 트랜잭션 원자성, 저장 공간 부족, 대기 목록 재시도·순서 | TS-15, TS-16 | 2 |
+| 오류 주입 | 테스트 전용 임시 트리거(`CREATE TEMP TRIGGER … RAISE(ABORT)`), `PRAGMA max_page_count` | 트랜잭션 원자성, 저장 공간 부족, 대기 목록 재시도·순서 | TS-15, TS-16 | 2 |
 | 실행 취소 | 위와 같음 | PRD TS-05(다시 그려 저장 → 실행 취소 → 수정본 1이 현재, 2는 이력에 남음), 회귀: 저장 → 삭제 → 실행 취소가 아무것도 바꾸지 않음 | TS-05 | 3 |
-| 마이그레이션 | Drift 스키마 테스트 | 버전별 DB 픽스처(`app/test/fixtures/db/`) | — | 2부터 |
+| 마이그레이션 | Drift 스키마 테스트 | 버전별 스키마 덤프(`app/drift_schemas/drift_schema_v<n>.json`, `dart run drift_dev schema dump`) | — | 3부터(v2 스키마가 생길 때) |
 | 위젯 | `flutter test` | 문맥 메뉴, 편집 후 복귀 위치, 실행 취소 스낵바, 대체 표시, 조합 중 정규화 미적용 | TS-09, TS-10, TS-11, TS-19 | 4 |
 | 내보내기 | `flutter test` + `tools/validate_ttf.py` | cmap·numGlyphs 식, 버전 증가, 실패 시 버전 유지, 강제 종료 시 데이터 불변 | TS-03, TS-08, TS-13, TS-14 | 5 |
 | 백업 | `flutter test` | 왕복, 손상·악성 파일 픽스처(압축 폭탄, `..` 경로, 범위 밖 좌표, 새 버전) | TS-17, TS-18 | 6 |
@@ -948,7 +948,7 @@ Riverpod 3, 코드 생성 없이 `Provider`/`NotifierProvider`/`StreamProvider`�
 | 단계 | 만들 파일 | 고칠·옮길 파일 | 지울 파일 | 통과 기준 |
 | --- | --- | --- | --- | --- |
 | 1 도메인 | `domain/font/metrics.dart`, `domain/font/ttf_reader.dart`, `domain/glyph/hwo1.dart`, `domain/ink/hws1.dart`, `domain/ink/quantize.dart`, `domain/hangul/normalize.dart`, `domain/decode_error.dart`, `test/golden/compose_v1.sha256`, `test/domain/**`, `test/support/tools.dart`, `tools/check_dev_imports.sh` | §15 단계 1 행 전부, `pubspec.yaml`(perfect_freehand·crypto 고정, dev 자산 제거) | `lib/app/*`, `lib/dev/fixture_glyphs.dart` | 단위, 해시 골든(TS-12) — 완료 |
-| 2 저장소 | `infra/db/schema.drift`, `infra/db/database.dart`(+ 생성 파일), `infra/db/*_dao.dart`, `state/pending_writes.dart`, `test/infra/db/**`, `test/fixtures/db/v1.sqlite`, `test/support/failing_executor.dart` | `pubspec.yaml`(drift, uuid) | — | TS-01, TS-02, TS-04, TS-06, TS-07, TS-15, TS-16, TS-20 |
+| 2 저장소 | `infra/db/schema.drift`, `infra/db/database.dart`(+ 생성 파일, 커밋함), `infra/db/{project,glyph,memo}_dao.dart`, `domain/hangul/base_set.dart`, `domain/font/naming.dart`, `state/pending_writes.dart`, `test/infra/db/**`, `test/state/pending_writes_test.dart`, `test/support/db.dart`, `drift_schemas/drift_schema_v1.json` | `pubspec.yaml`(drift, drift_flutter, sqlite3, uuid; dev: drift_dev, build_runner, fake_async) | — | TS-02, TS-04, TS-05(DAO), TS-06, TS-07, TS-15, TS-16, TS-20 — 완료 |
 | 3 상태 | `state/snapshot.dart`, `state/composer_provider.dart`, `state/undo.dart`, `test/state/**` | `pubspec.yaml`(flutter_riverpod) | — | TS-05 |
 | 4 화면 | `ui/**`, `infra/platform/dynamic_font.dart`, `main.dart`, `main_dev.dart`, `test/ui/**` | `ui/glyph_painter.dart` | — | TS-09, TS-10, TS-11, TS-19 |
 | 5 내보내기 | `state/export_job.dart`, `infra/platform/files.dart`, `integration_test/**`, `.github/workflows/ci.yml` | `pubspec.yaml` | — | TS-03, TS-08, TS-13, TS-14, TS-M1, TS-M2 |
@@ -998,4 +998,4 @@ Riverpod 3, 코드 생성 없이 `Provider`/`NotifierProvider`/`StreamProvider`�
 | --- | --- | --- |
 | v0.1.0 | 2026-11-19 | 최초 초안. PRD v0.4.0과 G0 1~3회차 기반 |
 | v0.2.0 | 2026-11-19 | v0.1.0 EGM 리뷰 반영. 획 f32 양자화와 기울기 저장, 쓰기 큐와 "화면 기준 = 커밋된 DB", 비교 후 교체 실행 취소, 백업 형식 JSON 스키마와 스트리밍 가져오기 검증, `drafts` DDL, 복합 외래 키와 수정본 삭제 트리거, 내보내기 원자성, `ruleVersion` 정의와 해시 골든, 한글 정규화, 메모 폰트 revision 기준·열린 메모 범위, 손바닥 방지, Android 저장·가져오기, iOS 설치 경로, 대안·위험·PRD 반영·구현 단계·추적표. 10자 미리보기 삭제 |
-| v0.3.0 | 2026-11-19 | v0.2.0 EGM 리뷰 반영. 전역 쓰기 큐 대신 Drift 직렬화 + 대상별 대기 목록, 모든 쓰기 실패를 알리고 자동 재시도(FR-01), `glyph_revision`·`base_revision` 열, 쓰기 표 보완, `_guard` 한 행 강제, 입력 상한과 그에서 도출한 백업 상한·압축률 검사, 백업 이름 정규식·역할 키 16진 파일명·메모 id 규칙, 규칙 v1의 PoC 변경점(컨투어 순서, 단독 자모 펜, 오류 판정, 퇴화 범위) 명시, `PenStyle` easing, 편집 표시 펜 = 저장 펜 56, 양자화 위치, 해시 골든 정의, 내보내기 백그라운드 처리 단순화, 메모 폰트 전환 기준값, 단계별 파일·패키지 버전·도구 결정, PoC 파일 처리 |
+| v0.3.0 | 2026-11-19 | v0.2.0 EGM 리뷰 반영. 전역 쓰기 큐 대신 Drift 직렬화 + 대상별 대기 목록, 모든 쓰기 실패를 알리고 자동 재시도(FR-01), `glyph_revision`·`base_revision` 열, 쓰기 표 보완, `revision_guard` 한 행 강제, 입력 상한과 그에서 도출한 백업 상한·압축률 검사, 백업 이름 정규식·역할 키 16진 파일명·메모 id 규칙, 규칙 v1의 PoC 변경점(컨투어 순서, 단독 자모 펜, 오류 판정, 퇴화 범위) 명시, `PenStyle` easing, 편집 표시 펜 = 저장 펜 56, 양자화 위치, 해시 골든 정의, 내보내기 백그라운드 처리 단순화, 메모 폰트 전환 기준값, 단계별 파일·패키지 버전·도구 결정, PoC 파일 처리 |

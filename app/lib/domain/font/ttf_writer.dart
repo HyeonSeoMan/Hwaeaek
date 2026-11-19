@@ -10,6 +10,7 @@ import 'dart:typed_data';
 
 import '../glyph/glyph.dart';
 import 'metrics.dart';
+import 'naming.dart';
 
 class FontGlyph {
   const FontGlyph(this.outline, this.advanceWidth);
@@ -344,7 +345,7 @@ class _TtfBuilder {
   Uint8List _name() {
     const en = 0x0409, ko = 0x0412;
     final ascii = spec.asciiFamilyName;
-    final ps = _postScriptName('$ascii-${spec.styleName}');
+    final ps = postScriptName('$ascii-${spec.styleName}');
     final records = <(int, int, String)>[
       // (languageID, nameID, value)
       if (spec.license.isNotEmpty) (en, 0, spec.license),
@@ -604,17 +605,4 @@ Uint8List _utf16be(String s) {
     w.u16(unit);
   }
   return w.bytes;
-}
-
-/// name ID 6 규칙: 인쇄 가능한 ASCII, 공백·`[](){}<>/%` 제외, 63자 이하.
-String _postScriptName(String s) {
-  const banned = '[](){}<>/% ';
-  final buf = StringBuffer();
-  for (final r in s.runes) {
-    if (r >= 33 && r <= 126 && !banned.contains(String.fromCharCode(r))) {
-      buf.writeCharCode(r);
-    }
-  }
-  final out = buf.toString();
-  return out.length > 63 ? out.substring(0, 63) : out;
 }
