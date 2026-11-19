@@ -1,9 +1,12 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../dev/fixture_glyphs.dart';
+import '../hangul/composer.dart';
 import '../hangul/hangul.dart';
 import 'base_glyph_screen.dart';
 import 'font_session.dart';
@@ -114,6 +117,35 @@ class _MemoScreenState extends State<MemoScreen> {
         appBar: AppBar(
           title: const Text('회애액 PoC — 내 폰트로 쓰기'),
           actions: [
+            PopupMenuButton<VoidCallback>(
+              tooltip: 'PoC 비교 설정',
+              icon: const Icon(Icons.tune),
+              onSelected: (action) => action(),
+              itemBuilder: (_) => [
+                for (final rule in CompositionRule.values)
+                  CheckedPopupMenuItem(
+                    checked: _session.rule == rule,
+                    value: () => _session.rule = rule,
+                    child: Text(switch (rule) {
+                      CompositionRule.outlineScale => '조합 v0: 윤곽선 축소',
+                      CompositionRule.strokeScale => '조합 v1: 획 단위',
+                    }),
+                  ),
+                const PopupMenuDivider(),
+                PopupMenuItem(
+                  value: () => _session.replaceBaseGlyphs(strokeBaseGlyphs()),
+                  child: const Text('기본 글리프: 획 픽스처'),
+                ),
+                PopupMenuItem(
+                  value: () async => _session.replaceBaseGlyphs(
+                    parseJamoFixture(
+                      await rootBundle.loadString('assets/dev/nanum_pen_jamo.json'),
+                    ),
+                  ),
+                  child: const Text('기본 글리프: 나눔 펜 윤곽선 (획 없음)'),
+                ),
+              ],
+            ),
             TextButton.icon(
               icon: const Icon(Icons.grid_view),
               label: const Text('기본 글리프'),

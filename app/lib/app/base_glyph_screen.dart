@@ -36,7 +36,7 @@ class BaseGlyphScreen extends StatelessWidget {
                     MaterialPageRoute<List<dynamic>>(
                       builder: (_) => GlyphEditorScreen(
                         title: '기본 글리프 ‘$j’',
-                        reference: session.baseGlyphs[j],
+                        reference: session.baseGlyphs[j]?.outline,
                       ),
                     ),
                   );
@@ -50,7 +50,7 @@ class BaseGlyphScreen extends StatelessWidget {
                         padding: const EdgeInsets.all(14),
                         child: CustomPaint(
                           size: Size.infinite,
-                          painter: GlyphPainter(session.baseGlyphs[j]),
+                          painter: GlyphPainter(session.baseGlyphs[j]?.outline),
                         ),
                       ),
                     ],

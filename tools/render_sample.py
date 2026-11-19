@@ -1,7 +1,7 @@
 """TTF로 문장을 렌더링해 PNG로 저장한다 (조합 품질 눈으로 확인용).
 
 사용법: .venv-tools/bin/python -I tools/render_sample.py FONT.ttf OUT.png "줄1" ["줄2" ...]
-        [--compare REFERENCE.ttf]  같은 문장을 참고 폰트로 아래에 함께 그린다.
+        [--compare OTHER.ttf ...]  같은 문장을 다른 폰트로 아래에 차례로 그린다(여러 번 가능).
 """
 
 import argparse
@@ -14,13 +14,13 @@ def main() -> None:
     parser.add_argument("font")
     parser.add_argument("out")
     parser.add_argument("lines", nargs="+")
-    parser.add_argument("--compare")
+    parser.add_argument("--compare", action="append", default=[])
     parser.add_argument("--size", type=int, default=64)
     args = parser.parse_args()
 
     fonts = [("ours", ImageFont.truetype(args.font, args.size))]
-    if args.compare:
-        fonts.append(("ref", ImageFont.truetype(args.compare, args.size)))
+    for path in args.compare:
+        fonts.append((path, ImageFont.truetype(path, args.size)))
 
     line_h = int(args.size * 1.4)
     width = int(max(len(l) for l in args.lines) * args.size * 1.05) + 40

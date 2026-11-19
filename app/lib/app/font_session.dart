@@ -35,15 +35,16 @@ class _UndoEntry {
 }
 
 class FontSession extends ChangeNotifier {
-  FontSession(Map<String, GlyphOutline> baseGlyphs)
+  FontSession(Map<String, BaseGlyph> baseGlyphs)
     : _baseGlyphs = Map.of(baseGlyphs) {
-    _composer = HangulComposer(_baseGlyphs);
+    _composer = HangulComposer(_baseGlyphs, rule: _rule);
   }
 
   static const ascender = 800;
   static const descender = -200;
 
-  final Map<String, GlyphOutline> _baseGlyphs;
+  final Map<String, BaseGlyph> _baseGlyphs;
+  var _rule = CompositionRule.strokeScale;
   late HangulComposer _composer;
   final _custom = <int, CustomGlyph>{};
   final _selection = <int, GlyphSource>{};
@@ -62,7 +63,22 @@ class FontSession extends ChangeNotifier {
 
   String? get fontFamily => _family;
 
-  Map<String, GlyphOutline> get baseGlyphs => Map.unmodifiable(_baseGlyphs);
+  Map<String, BaseGlyph> get baseGlyphs => Map.unmodifiable(_baseGlyphs);
+
+  CompositionRule get rule => _rule;
+
+  set rule(CompositionRule value) {
+    _rule = value;
+    _rebuildComposer();
+  }
+
+  /// 기본 글리프 세트를 통째로 바꾼다 (PoC 픽스처 전환).
+  void replaceBaseGlyphs(Map<String, BaseGlyph> glyphs) {
+    _baseGlyphs
+      ..clear()
+      ..addAll(glyphs);
+    _rebuildComposer();
+  }
 
   GlyphSource selectionOf(int cp) => _selection[cp] ?? GlyphSource.generated;
 
@@ -81,8 +97,12 @@ class FontSession extends ChangeNotifier {
   // ---- 편집 ----
 
   void setBaseGlyph(String jamo, List<InkStroke> strokes) {
-    _baseGlyphs[jamo] = strokesToOutline(strokes);
-    _composer = HangulComposer(_baseGlyphs);
+    _baseGlyphs[jamo] = BaseGlyph.strokes(strokes);
+    _rebuildComposer();
+  }
+
+  void _rebuildComposer() {
+    _composer = HangulComposer(_baseGlyphs, rule: _rule);
     _invalidate();
   }
 

@@ -91,4 +91,57 @@ void main() {
       'ㅋㅋㅋ ㅠㅠ 한글 손글씨',
     ]);
   });
+
+  test('획 픽스처: v0(윤곽선 축소)과 v1(획 단위) 비교 폰트와 이미지', () async {
+    final strokes = strokeBaseGlyphs();
+    final out = Directory('../build/poc')..createSync(recursive: true);
+    final fonts = <CompositionRule, File>{};
+    for (final rule in CompositionRule.values) {
+      final composer = HangulComposer(strokes, rule: rule);
+      final sw = Stopwatch()..start();
+      final glyphs = <int, FontGlyph>{
+        for (var cp = compatJamoFirst; cp <= compatJamoLast; cp++)
+          cp: FontGlyph(composer.compose(cp)!, 1000),
+        for (var cp = syllableFirst; cp <= syllableLast; cp++)
+          cp: FontGlyph(composer.compose(cp)!, 1000),
+      };
+      final bytes = buildTtf(
+        FontSpec(
+          familyName: 'v${rule.version}',
+          asciiFamilyName: 'StrokeV${rule.version}',
+          ascender: 800,
+          descender: -200,
+          glyphs: glyphs,
+        ),
+      );
+      // ignore: avoid_print
+      print(
+        '규칙 v${rule.version}: 조합+빌드 ${sw.elapsedMilliseconds}ms, '
+        '${(bytes.length / 1048576).toStringAsFixed(2)}MB',
+      );
+      fonts[rule] = File('${out.path}/stroke_v${rule.version}.ttf')
+        ..writeAsBytesSync(bytes);
+    }
+    final python = File('../.venv-tools/bin/python');
+    if (!python.existsSync()) return;
+    for (final f in fonts.values) {
+      final v = await Process.run(python.path, [
+        '-I',
+        '../tools/validate_ttf.py',
+        f.path,
+      ]);
+      expect(v.exitCode, 0, reason: '${v.stderr}');
+    }
+    await Process.run(python.path, [
+      '-I',
+      '../tools/render_sample.py',
+      fonts[CompositionRule.strokeScale]!.path,
+      '${out.path}/stroke_v1_vs_v0.png',
+      '다람쥐 헌 쳇바퀴에 타고파',
+      '닭 볶음탕 뷁 왠지 꿇어앉아',
+      '한글 손글씨 폰트 ㅋㅋ',
+      '--compare',
+      fonts[CompositionRule.outlineScale]!.path,
+    ]);
+  });
 }
