@@ -644,7 +644,8 @@ Riverpod 3, 코드 생성 없이 `Provider`/`NotifierProvider`/`StreamProvider`�
 | `projectListProvider` | 프로젝트 목록 스트림 | 화면 |
 | `projectProvider(id)` | 프로젝트 + 메타데이터 | 프로젝트 열림 동안 |
 | `snapshotProvider(id)` | `GlyphSnapshot`(§3.3) | 프로젝트 열림 동안 |
-| `composerProvider(id)` | 조합 엔진 + 캐시(§6.5). `baseRevision`이 바뀔 때만 다시 만듦 | 프로젝트 열림 동안 |
+| `glyphRendererProvider(id)` | 스냅샷 + 조합 엔진 캐시(§6.5). `outline(cp)`가 유효 글리프. 조합 엔진은 `baseRevision`이 바뀔 때만 다시 만듦 | 프로젝트 열림 동안 |
+| `glyphActionsProvider(id)` | 글리프 쓰기(대기 목록 경유)와 실행 취소 기록 | 프로젝트 열림 동안 |
 | `memoFontProvider(memoId)` | §8.1 | 메모 열림 동안 |
 | `undoProvider` | §9.1 슬롯 | 앱 |
 | `exportJobProvider(id)` | §7.2 진행 상태 | 작업 동안 |
@@ -949,7 +950,7 @@ Riverpod 3, 코드 생성 없이 `Provider`/`NotifierProvider`/`StreamProvider`�
 | --- | --- | --- | --- | --- |
 | 1 도메인 | `domain/font/metrics.dart`, `domain/font/ttf_reader.dart`, `domain/glyph/hwo1.dart`, `domain/ink/hws1.dart`, `domain/ink/quantize.dart`, `domain/hangul/normalize.dart`, `domain/decode_error.dart`, `test/golden/compose_v1.sha256`, `test/domain/**`, `test/support/tools.dart`, `tools/check_dev_imports.sh` | §15 단계 1 행 전부, `pubspec.yaml`(perfect_freehand·crypto 고정, dev 자산 제거) | `lib/app/*`, `lib/dev/fixture_glyphs.dart` | 단위, 해시 골든(TS-12) — 완료 |
 | 2 저장소 | `infra/db/schema.drift`, `infra/db/database.dart`(+ 생성 파일, 커밋함), `infra/db/{project,glyph,memo}_dao.dart`, `domain/hangul/base_set.dart`, `domain/font/naming.dart`, `state/pending_writes.dart`, `test/infra/db/**`, `test/state/pending_writes_test.dart`, `test/support/db.dart`, `drift_schemas/drift_schema_v1.json` | `pubspec.yaml`(drift, drift_flutter, sqlite3, uuid; dev: drift_dev, build_runner, fake_async) | — | TS-02, TS-04, TS-05(DAO), TS-06, TS-07, TS-15, TS-16, TS-20 — 완료 |
-| 3 상태 | `state/snapshot.dart`, `state/composer_provider.dart`, `state/undo.dart`, `test/state/**` | `pubspec.yaml`(flutter_riverpod) | — | TS-05 |
+| 3 상태 | `domain/project/snapshot.dart`(스냅샷, 유효 글리프, LRU 캐시), `state/providers.dart`, `state/snapshot.dart`(스냅샷·렌더러 provider), `state/glyph_actions.dart`(쓰기 동작, 실행 취소), `test/state/glyph_state_test.dart` | `pubspec.yaml`(flutter_riverpod), `infra/db/glyph_dao.dart`(`GlyphSelection`을 도메인으로) | — | TS-01, TS-05 — 완료 |
 | 4 화면 | `ui/**`, `infra/platform/dynamic_font.dart`, `main.dart`, `main_dev.dart`, `test/ui/**` | `ui/glyph_painter.dart` | — | TS-09, TS-10, TS-11, TS-19 |
 | 5 내보내기 | `state/export_job.dart`, `infra/platform/files.dart`, `integration_test/**`, `.github/workflows/ci.yml` | `pubspec.yaml` | — | TS-03, TS-08, TS-13, TS-14, TS-M1, TS-M2 |
 | 6 백업 | `infra/backup/**`, `test/infra/backup/**`, `test/fixtures/backup/**` | `pubspec.yaml`(archive) | — | TS-17, TS-18 |

@@ -10,10 +10,11 @@ import '../../domain/glyph/hwo1.dart';
 import '../../domain/hangul/base_set.dart';
 import '../../domain/ink/hws1.dart';
 import '../../domain/ink/ink.dart';
+import '../../domain/project/snapshot.dart';
+
+export '../../domain/project/snapshot.dart' show GlyphSelection;
 import 'database.dart';
 import 'project_dao.dart';
-
-enum GlyphSelection { generated, custom }
 
 /// 음절 하나의 커스텀 상태. 행이 없으면 null로 나타낸다.
 class CustomState {

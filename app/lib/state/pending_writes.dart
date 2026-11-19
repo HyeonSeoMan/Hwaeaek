@@ -60,15 +60,15 @@ class PendingWrites {
   final _banner = StreamController<WriteBanner>.broadcast();
   var _current = WriteBanner.none;
 
-  static Duration _defaultBackoff(int failures) =>
-      Duration(seconds: [1 << (failures - 1), 30].reduce((a, b) => a < b ? a : b));
+  static Duration _defaultBackoff(int failures) => Duration(
+    seconds: [1 << (failures - 1), 30].reduce((a, b) => a < b ? a : b),
+  );
 
   WriteBanner get banner => _current;
   Stream<WriteBanner> get bannerChanges => _banner.stream;
 
-  bool get hasPendingGlyphWrites => _queues.values.any(
-    (q) => q.any((i) => i.kind == WriteKind.glyph),
-  );
+  bool get hasPendingGlyphWrites =>
+      _queues.values.any((q) => q.any((i) => i.kind == WriteKind.glyph));
 
   bool isPending(String key) => _queues[key]?.isNotEmpty ?? false;
 
