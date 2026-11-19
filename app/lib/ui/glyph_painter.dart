@@ -7,8 +7,7 @@ import '../domain/glyph/glyph.dart';
 /// 캔버스는 y = ascender(위)부터 descender(아래)까지 1000 단위를 담는다.
 Path outlineToPath(GlyphOutline outline, double side) {
   final s = side / 1000;
-  Offset map(GlyphPoint p) =>
-      Offset(p.x * s, (FontMetrics.ascender - p.y) * s);
+  Offset map(GlyphPoint p) => Offset(p.x * s, (FontMetrics.ascender - p.y) * s);
   Offset mid(GlyphPoint a, GlyphPoint b) => (map(a) + map(b)) / 2;
 
   final path = Path()..fillType = PathFillType.nonZero;
@@ -59,7 +58,10 @@ class GlyphPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final o = outline;
     if (o == null) return;
-    canvas.drawPath(outlineToPath(o, size.shortestSide), Paint()..color = color);
+    canvas.drawPath(
+      outlineToPath(o, size.shortestSide),
+      Paint()..color = color,
+    );
   }
 
   @override

@@ -166,10 +166,9 @@ class PenStyle {
 Contour? strokeToContour(InkStroke stroke, PenStyle pen) {
   if (stroke.points.isEmpty) return null;
   final hasPressure = stroke.points.every((p) => p.pressure != null);
-  final outline = getStroke(
-    [for (final p in stroke.points) PointVector(p.x, p.y, p.pressure)],
-    options: pen._options(simulatePressure: !hasPressure),
-  );
+  final outline = getStroke([
+    for (final p in stroke.points) PointVector(p.x, p.y, p.pressure),
+  ], options: pen._options(simulatePressure: !hasPressure));
   final raw = [for (final o in outline) (o.dx, o.dy)];
   final simplified = pen.tolerance > 0
       ? _simplifyClosed(raw, pen.tolerance)
@@ -191,9 +190,7 @@ Contour? strokeToContour(InkStroke stroke, PenStyle pen) {
 GlyphOutline strokesToOutline(
   List<InkStroke> strokes, {
   PenStyle pen = PenStyle.base,
-}) => GlyphOutline([
-  for (final s in strokes) ?strokeToContour(s, pen),
-]);
+}) => GlyphOutline([for (final s in strokes) ?strokeToContour(s, pen)]);
 
 typedef _Pt = (double, double);
 

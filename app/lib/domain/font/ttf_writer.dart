@@ -92,7 +92,10 @@ Uint8List buildTtf(FontSpec spec) => _TtfBuilder(spec).build();
 class _TtfBuilder {
   _TtfBuilder(this.spec) {
     final map = Map<int, FontGlyph>.of(spec.glyphs);
-    map.putIfAbsent(0x20, () => const FontGlyph(GlyphOutline.empty, FontMetrics.spaceAdvance));
+    map.putIfAbsent(
+      0x20,
+      () => const FontGlyph(GlyphOutline.empty, FontMetrics.spaceAdvance),
+    );
     codePoints = map.keys.toList()..sort();
     for (final cp in codePoints) {
       if (cp < 0 || cp > 0xFFFE) {
@@ -497,7 +500,9 @@ class _GlyfData {
 
     for (var i = 0; i < flags.length;) {
       var run = 1;
-      while (i + run < flags.length && flags[i + run] == flags[i] && run < 256) {
+      while (i + run < flags.length &&
+          flags[i + run] == flags[i] &&
+          run < 256) {
         run++;
       }
       if (run > 1) {

@@ -137,6 +137,15 @@ class HangulComposer {
     };
   }
 
+  /// 기본 글리프 편집 가이드의 배치 영역 (Spec §5): 그 자모가 받침 없는 음절에서
+  /// 놓이는 자리. 자음은 세로형 초성 자리, 모음은 모양별 중성 자리.
+  static Slot guideSlotFor(String jamo) {
+    if (jungseong.contains(jamo)) {
+      return _layouts[(vowelShape(jamo), false)]!.vowel;
+    }
+    return _layouts[(VowelShape.vertical, false)]!.lead;
+  }
+
   static Set<String> _jamoKeys(String j) {
     final pair = compoundConsonants[j];
     return pair == null ? {j} : {j, pair.$1, pair.$2};
@@ -165,7 +174,11 @@ class HangulComposer {
     final vowel = _place(s.vowel, layout.vowel);
     final tail = s.hasTail ? _place(s.tail, layout.tail!) : GlyphOutline.empty;
     if (lead == null || vowel == null || tail == null) return null;
-    return GlyphOutline([...lead.contours, ...vowel.contours, ...tail.contours]);
+    return GlyphOutline([
+      ...lead.contours,
+      ...vowel.contours,
+      ...tail.contours,
+    ]);
   }
 
   /// 자모 [j]를 [slot]에 넣은 윤곽선. 기본 글리프가 없으면 겹자음은 구성 자음을
@@ -235,7 +248,9 @@ class HangulComposer {
     );
   }
 
-  static (double, double, double, double)? _strokeBounds(List<InkStroke> strokes) {
+  static (double, double, double, double)? _strokeBounds(
+    List<InkStroke> strokes,
+  ) {
     double? x0, y0, x1, y1;
     for (final s in strokes) {
       for (final p in s.points) {

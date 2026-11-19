@@ -45,7 +45,8 @@ Uint8List encodeHwo1(GlyphOutline outline) {
 
 GlyphOutline decodeHwo1(Uint8List bytes) {
   final d = ByteData.sublistView(bytes);
-  if (bytes.length < 6 || ascii.decode(bytes.sublist(0, 4), allowInvalid: true) != _magic) {
+  if (bytes.length < 6 ||
+      ascii.decode(bytes.sublist(0, 4), allowInvalid: true) != _magic) {
     throw const DecodeError('HWO1 magic');
   }
   var o = 4;

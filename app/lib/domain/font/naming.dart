@@ -19,7 +19,8 @@ String postScriptName(String s) {
 String? asciiFamilyNameError(String name) {
   if (name.isEmpty || name.length > 31) return '1~31자여야 합니다';
   for (final r in name.runes) {
-    final ok = r == 0x20 ||
+    final ok =
+        r == 0x20 ||
         (r >= 33 && r <= 126 && !_psBanned.contains(String.fromCharCode(r)));
     if (!ok) return '영문, 숫자, 일부 기호만 쓸 수 있습니다';
   }

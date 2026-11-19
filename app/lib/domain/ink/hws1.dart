@@ -50,7 +50,8 @@ Uint8List encodeHws1(List<InkStroke> strokes) {
 /// 형식과 상한을 모두 검사한다. 위반하면 [DecodeError].
 List<InkStroke> decodeHws1(Uint8List bytes) {
   final d = ByteData.sublistView(bytes);
-  if (bytes.length < 6 || ascii.decode(bytes.sublist(0, 4), allowInvalid: true) != _magic) {
+  if (bytes.length < 6 ||
+      ascii.decode(bytes.sublist(0, 4), allowInvalid: true) != _magic) {
     throw const DecodeError('HWS1 magic');
   }
   var o = 4;
@@ -66,7 +67,9 @@ List<InkStroke> decodeHws1(Uint8List bytes) {
     final n = d.getUint32(o, Endian.little);
     o += 4;
     total += n;
-    if (n < 1 || n > InkLimits.maxPointsPerStroke || total > InkLimits.maxPointsPerGlyph) {
+    if (n < 1 ||
+        n > InkLimits.maxPointsPerStroke ||
+        total > InkLimits.maxPointsPerGlyph) {
       throw DecodeError('HWS1 pointCount $n');
     }
     if (o + n * _pointBytes > bytes.length) {
