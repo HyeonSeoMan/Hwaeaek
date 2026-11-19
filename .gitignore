@@ -30,3 +30,4 @@ key.properties
 **/ios/Flutter/flutter_export_environment.sh
 **/ios/Runner/GeneratedPluginRegistrant.*
 **/ios/**/xcuserdata/
+.venv-tools/
