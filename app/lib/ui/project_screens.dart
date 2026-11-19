@@ -18,6 +18,7 @@ import '../state/providers.dart';
 import '../state/snapshot.dart';
 import 'base_glyph_screen.dart';
 import 'export_screen.dart';
+import 'frequency_screen.dart';
 import 'memo_screen.dart';
 
 Future<String?> _askName(
@@ -239,6 +240,17 @@ class _ProjectHomeScreenState extends ConsumerState<ProjectHomeScreen> {
               ),
             ),
           ),
+          if (unlocked)
+            IconButton(
+              tooltip: '자주 쓰는 글자',
+              icon: const Icon(Icons.sort_by_alpha),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => FrequencyScreen(projectId: _id),
+                ),
+              ),
+            ),
           if (unlocked)
             IconButton(
               tooltip: 'TTF 내보내기',

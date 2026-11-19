@@ -8,6 +8,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../domain/font/export.dart';
 import '../state/export_job.dart';
+import '../state/frequency.dart';
 
 class ExportScreen extends ConsumerStatefulWidget {
   const ExportScreen({super.key, required this.projectId});
@@ -131,7 +132,7 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
 }
 
 /// 결과 시트: 제외 음절 수와 목록을 저장·공유 전에 보여 준다(FR-08).
-class _Result extends StatelessWidget {
+class _Result extends ConsumerWidget {
   const _Result({
     required this.ready,
     required this.busy,
@@ -149,8 +150,10 @@ class _Result extends StatelessWidget {
   final VoidCallback onCancel;
 
   @override
-  Widget build(BuildContext context) {
-    final excluded = ready.build.excluded;
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 제외 목록은 자주 쓰는 순서로 보여 준다(Spec §7.2, §14).
+    final order = ref.watch(frequencyOrderProvider).value;
+    final excluded = order?.sort(ready.build.excluded) ?? ready.build.excluded;
     final text = Theme.of(context).textTheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -173,7 +176,6 @@ class _Result extends StatelessWidget {
           Expanded(
             child: SingleChildScrollView(
               child: Text(
-                // 빈도 순 정렬은 단계 7(Spec §14). 지금은 Unicode 순.
                 excluded.map(String.fromCharCode).join(' '),
                 style: const TextStyle(fontSize: 18, height: 1.6),
               ),
