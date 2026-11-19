@@ -2,7 +2,7 @@
 
 > **문서 버전:** v0.2.0 (조사 초안)  
 > **작성일:** 2026-11-19 · **최종 수정일:** 2026-11-19  
-> **관련 문서:** [MVP 1.0 PRD v0.3.0](../hwaeaek-mvp1-prd-v0.3.0.md)
+> **관련 문서:** [MVP 1.0 PRD v0.4.1](../hwaeaek-mvp1-prd-v0.4.1.md) · [구현 명세](spec/mvp1-spec.md)
 
 **상태 표시:** `[확정]` PRD에서 확정됨 · `[추천]` 조사 기반 1순위 · `[후보]` 대안 · `[검증 필요]` G0 PoC에서 확인
 
@@ -15,7 +15,7 @@
   - 근거: PRD NFR-04 "시스템은 필기 저장, 조합, TTF 빌드를 모두 기기 안에서 수행한다", NFR-05 "앱은 런타임에 외부 AI/LLM API를 호출하지 않는다".
   - 빈도 데이터는 라이선스가 허용하면 앱 번들에 포함한다(PRD OQ-05).
   - 예외: G0에서 온디바이스 TTF 빌드가 불가능하다고 판명되면 서버 빌드(Python fontTools)를 재검토한다. 이 경우 PRD 변경이 필요하다.
-- **단일 조합 엔진** `[확정]`: 앱 안 표시와 TTF 빌드가 같은 Dart 조합 엔진을 쓴다. 자동 생성 글리프는 저장하지 않고 필요할 때 계산한다(메모리 캐시만 허용). 좌표는 정수 또는 고정 소수점으로 계산해 결정성을 보장한다. TTF 빌더(Rust 등)는 엔진이 만든 윤곽선을 받아 직렬화만 한다.
+- **단일 조합 엔진** `[확정]`: 앱 안 표시와 TTF 빌드가 같은 Dart 조합 엔진을 쓴다. 자동 생성 글리프는 저장하지 않고 필요할 때 계산한다(메모리 캐시만 허용). 결과 윤곽선은 정수 좌표다. 같은 기기 안에서 결과가 같고, 기기 간 1단위 차이는 허용한다(PRD FR-04, 구현 명세 §6.3). TTF 빌더는 엔진이 만든 윤곽선을 받아 직렬화만 한다.
 
 ## 2. 처리 파이프라인
 
@@ -33,14 +33,14 @@
 |---|---|---|---|
 | ① 필기 입력 | 압력·기울기, 펜/손가락 구분 | Flutter 기본 `Listener` / `PointerEvent` | `[추천]` 지연과 Apple Pencil coalesced·predicted touch 전달 여부 `[검증 필요]` (NFR-02, OQ-08) |
 | ② 획 → 윤곽선 | 점 목록 → 굵기 있는 다각형 | [`perfect_freehand`](https://pub.dev/packages/perfect_freehand) | `[추천]` |
-| ③ 윤곽선 정리 | 획 union, 단순화, 2차 곡선 맞춤 | [`clipper2`](https://pub.dev/packages/clipper2) + 곡선 맞춤 자체 구현 | `[후보]` 0.0.3 버전이라 `[검증 필요]` |
-| ④ 조합 엔진 | 위치별 자모 변형(벌)과 배치 규칙, 호환 자모 단독 배치 | 자체 구현(Dart) | 핵심 기술, PRD OQ-01 |
-| ⑤ TTF 빌드 | glyf, cmap 등 TTF 테이블 작성, 빌드 후 재파싱 검증 | 3장 참고. 재파싱은 `fontations`의 read-fonts/skrifa | 최대 위험, PRD OQ-03 |
+| ③ 윤곽선 정리 | 단순화(Douglas–Peucker), 겹침은 OVERLAP_SIMPLE 플래그 | 자체 구현. [`clipper2`](https://pub.dev/packages/clipper2) union은 구현 명세 §17에서 기각(외부 프로그램에서 겹침 문제가 보이면 재검토) | `[추천]` |
+| ④ 조합 엔진 | 위치별 자모 변형(벌)과 배치 규칙, 호환 자모 단독 배치 | 자체 구현(Dart). 기본 글리프 원본 획을 자리로 옮겨 펜을 다시 입힌다(G0 규칙 v1) | 핵심 기술, PRD OQ-01 |
+| ⑤ TTF 빌드 | glyf, cmap 등 TTF 테이블 작성, 빌드 후 재파싱 검증 | 3장 참고. 재파싱은 자체 최소 리더(구현 명세 §7.3, `fontations` 읽기는 §17에서 기각) | PRD OQ-03 |
 | ⑥ 저장 | 프로젝트, 원본 획, 커스텀 수정 이력, 선택 상태, 메모, 폰트 메타데이터. 트랜잭션 저장 | [Drift](https://drift.simonbinder.eu/) (SQLite) + `path_provider` | `[추천]` (PRD OQ-07) |
 | ⑥-백업 | 프로젝트 파일 내보내기·가져오기 | 단일 파일(예: zip + JSON + 획 데이터), 스키마 버전 검사 | `[후보]` (PRD FR-09) |
 | ⑦ 내보내기 | 기기 저장, OS 공유 | `share_plus`, `file_picker` | `[추천]` |
 | ⑦-iOS 폰트 설치 | 앱 안에서 시스템 폰트로 설치 | 플랫폼 채널 + `CTFontManagerRegisterFontURLs`(persistent 범위), `com.apple.developer.user-fonts`(`system-installation`) | `[검증 필요]` Apple 문서는 앱이 소유·번들한 폰트에 쓰라고 안내하므로 사용자 생성 폰트 허용 여부, 재등록 절차, 심사 조건 확인 필요 (PRD OQ-09) |
-| ⑧ 앱 안 표시 | 메모 화면에서 조합 엔진 윤곽선을 직접 그리기 | `CustomPainter` + 음절별 `Path` 캐시, 입력은 Flutter `EditableText`/`TextInputClient` 기반 | `[검증 필요]` 한글 IME 조합 중 표시, 커서·선택·줄바꿈, 글리프 폭과 커서 위치 일치 (PRD OQ-10, OQ-11, RISK-07) |
+| ⑧ 앱 안 표시 | 메모 글자만 담은 동적 폰트 | ⑤ TTF 빌더로 작은 폰트를 만들어 `FontLoader`로 등록(빌드마다 새 패밀리 이름), 일반 `TextField`로 표시 | `[추천]` G0 1회차 macOS 동작. iPad 등록 지연 `[검증 필요]` (PRD OQ-11, RISK-07) |
 | 빈도 목록 | 음절 사용 빈도 | 국립국어원 빈도 조사 / 모두의 말뭉치. 불가 시 KS X 1001 2,350자 우선 | 라이선스 `[검증 필요]` (PRD OQ-05) |
 | 상태 관리 | 화면 상태, 의존성 주입 | Riverpod | `[추천]` |
 | 테스트 | 단위, 골든, 폰트 검증 | `flutter_test`, CI에서 테스트 코퍼스 TTF의 fontTools·OTS(OpenType Sanitizer) 검증 | `[추천]` (PRD NFR-01, G2) |
@@ -54,7 +54,7 @@
 | **C. 순수 Dart TTF 작성기** | 외부 의존성 없음. 필요 테이블이 약 10개(head, hhea, maxp, OS/2, name, cmap, post, glyf, loca, hmtx)라 구현 가능한 규모 | 바이너리 형식 세부 사항을 직접 처리. 쓸 만한 Dart 작성 라이브러리 없음(읽기 전용만 존재) |
 | D. 서버 Python fontTools | 가장 성숙한 도구 | 서버 없음 원칙에 어긋남 (1장 예외로만) |
 
-**추천 경로:** G0에서 A로 처음부터 끝까지 동작하는지 검증한다. 패키지가 불안정하면 B로 바꾸고, Rust 의존성을 피하고 싶으면 C로 간다. `opentype.js`는 OTF만 출력하는 것으로 보여 제외했다.
+**채택 (G0 1회차):** C안(순수 Dart, `app/lib/font/ttf_writer.dart`). 첫 구현이 OTS·fontTools를 통과했고, 11,172자 빌드가 Mac에서 수백 ms이며, Rust 도구가 필요 없다. A안은 Android 빌드에 `cargo-ndk`가 필요하다. 기기 안 재파싱 검증이 필요하면 A안의 읽기 기능만 쓰는 것을 검토한다. `opentype.js`는 OTF만 출력하는 것으로 보여 제외했다.
 
 ## 4. 설계 고려 사항
 

@@ -1,6 +1,6 @@
 # G0 PoC 기록
 
-> **관련 문서:** [PRD v0.3.0](../../hwaeaek-mvp1-prd-v0.3.0.md) · [기술 스택](../tech-stack.md)  
+> **관련 문서:** [PRD v0.4.1](../../hwaeaek-mvp1-prd-v0.4.1.md) · [기술 스택](../tech-stack.md)  
 > **환경:** MacBook (Apple Silicon), macOS 27.2.1, Flutter 3.50.0, Xcode 27.2
 
 ## 1회차 (2026-11-19) — 처음부터 끝까지 얇은 흐름
