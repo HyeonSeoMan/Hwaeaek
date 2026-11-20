@@ -4,6 +4,7 @@ library;
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../domain/glyph/latin_set.dart';
 import '../domain/hangul/hangul.dart';
 import '../domain/hangul/normalize.dart';
 
@@ -36,17 +37,23 @@ class HangulNormalizeFormatter extends TextInputFormatter {
 class MemoTextController extends TextEditingController {
   MemoTextController({super.text});
 
-  /// 조합 오류로 알려진 글자 (MemoFontState.knownErrors).
+  /// 조합 오류이거나 아직 그리지 않은 글자 (MemoFontState.knownErrors).
   Set<int> knownErrors = const {};
 
   /// 대체 표시 스타일의 색.
   Color fallbackColor = const Color(0xFF8A8A8A);
 
-  static bool isFallback(int cp, Set<int> knownErrors) =>
-      cp == 0x20 || cp == 0x0A
-      ? false
-      : !(Syllable.isSyllable(cp) || Syllable.isCompatJamo(cp)) ||
-            knownErrors.contains(cp);
+  /// 사용자 폰트로 그릴 수 없는 글자인지. 한글·호환 자모·영문 세트는 조합 오류나
+  /// 아직 그리지 않은 것(knownErrors)만, 그 밖의 문자(이모지 등)는 항상 대체 표시.
+  static bool isFallback(int cp, Set<int> knownErrors) {
+    if (cp == 0x20 || cp == 0x0A) return false;
+    if (Syllable.isSyllable(cp) ||
+        Syllable.isCompatJamo(cp) ||
+        isLatinGlyph(cp)) {
+      return knownErrors.contains(cp);
+    }
+    return true;
+  }
 
   @override
   TextSpan buildTextSpan({

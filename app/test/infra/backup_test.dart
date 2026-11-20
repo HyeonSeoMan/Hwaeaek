@@ -65,6 +65,9 @@ void main() {
     await t.projects.updateFontMetadata(p, familyName: '내 손글씨', asciiFamilyName: 'My Hand', license: 'OFL');
     await t.projects.commitFontVersion(p, 4);
 
+    await t.glyphs.saveBaseGlyph(p, 'A', [
+      const InkStroke([InkPoint(200, 0), InkPoint(400, 680), InkPoint(600, 0)]),
+    ]);
     final file = await backup();
     expect(file.path, endsWith('.hwaeaek'));
     final id = await importBackup(t.db, file);
@@ -76,7 +79,7 @@ void main() {
       (a.name, a.fontFamilyName, a.fontAsciiName, a.fontLicense, a.fontVersionMinor, a.memoUnlockedAt),
     );
     expect(b.glyphRevision, 0);
-    expect(await t.glyphs.baseGlyphs(id), hasLength(35));
+    expect(await t.glyphs.baseGlyphs(id), hasLength(36)); // 35 + 영문 A
 
     final kangA = await t.glyphs.revisions(p, kang), kangB = await t.glyphs.revisions(id, kang);
     String key(CustomRevisionRow r) => '${r.createdAt}|${r.strokes}|${r.outline}|${r.pen}';

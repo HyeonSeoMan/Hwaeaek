@@ -4,6 +4,7 @@ library;
 import 'dart:typed_data';
 
 import '../compose/composer.dart';
+import '../glyph/latin_set.dart';
 import '../hangul/hangul.dart';
 import '../project/snapshot.dart';
 import 'metrics.dart';
@@ -23,7 +24,7 @@ class ExportBuild {
   /// cmap에서 뺀 음절·호환 자모 (조합 오류, 손상된 커스텀).
   final List<int> excluded;
 
-  /// 유효 글리프가 있는 호환 자모 + 음절 수.
+  /// 유효 글리프가 있는 호환 자모 + 음절 + 영문·숫자 수.
   final int validCount;
   final int versionMinor;
 }
@@ -38,7 +39,8 @@ Iterable<int> exportCodePoints() sync* {
   }
 }
 
-const exportTotal = 51 + syllableCount;
+/// 진행률 분모. 그리지 않은 영문·숫자는 건너뛰므로 실제 처리 수보다 클 수 있다.
+final exportTotal = 51 + syllableCount + latinCodePoints.length;
 
 ExportBuild buildExport(
   GlyphSnapshot snapshot, {
@@ -62,6 +64,17 @@ ExportBuild buildExport(
       glyphs[cp] = FontGlyph(g, FontMetrics.hangulAdvance);
     }
     if (++done % 500 == 0) onProgress?.call(done);
+  }
+  // 숫자·문장부호·영문: 그린 글자만 넣는다. 그리지 않은 글자는 선택이므로 제외 목록에 넣지 않는다.
+  for (final cp in latinCodePoints) {
+    if (!snapshot.baseStrokes.containsKey(String.fromCharCode(cp))) continue;
+    final g = composer.compose(cp);
+    if (g == null || g.isEmpty || g.pointCount > 0xFFFF) {
+      excluded.add(cp);
+    } else {
+      glyphs[cp] = FontGlyph(g, latinAdvance(g));
+    }
+    done++;
   }
   onProgress?.call(done);
   final m = snapshot.metadata;

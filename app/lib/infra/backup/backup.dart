@@ -15,6 +15,7 @@ import 'package:uuid/uuid.dart';
 import '../../domain/decode_error.dart';
 import '../../domain/font/naming.dart';
 import '../../domain/glyph/hwo1.dart';
+import '../../domain/glyph/latin_set.dart';
 import '../../domain/hangul/base_set.dart';
 import '../../domain/hangul/hangul.dart';
 import '../../domain/ink/hws1.dart';
@@ -534,6 +535,7 @@ class _BackupReader {
     final jamo = {
       for (var cp = compatJamoFirst; cp <= compatJamoLast; cp++)
         String.fromCharCode(cp),
+      for (final cp in latinCodePoints) String.fromCharCode(cp),
     };
     final base = <_BaseEntry>[];
     final baseFiles = _entries.keys

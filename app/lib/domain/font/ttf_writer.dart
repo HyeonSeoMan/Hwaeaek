@@ -238,6 +238,13 @@ class _TtfBuilder {
     var unicode1 = 0, unicode2 = 0, codePage1 = 0;
     for (final cp in codePoints) {
       if (cp <= 0x7F) unicode1 |= 1; // bit 0 Basic Latin
+      if (cp >= 0x80 && cp <= 0xFF) unicode1 |= 1 << 1; // Latin-1 Supplement
+      if (cp >= 0x2000 && cp <= 0x206F) {
+        unicode1 |= 1 << 31; // General Punctuation
+      }
+      if ((cp >= 0x41 && cp <= 0x5A) || (cp >= 0x61 && cp <= 0x7A)) {
+        codePage1 |= 1; // Latin 1
+      }
       if (cp >= 0x3130 && cp <= 0x318F) unicode2 |= 1 << (52 - 32);
       if (cp >= 0xAC00 && cp <= 0xD7AF) {
         unicode2 |= 1 << (56 - 32);

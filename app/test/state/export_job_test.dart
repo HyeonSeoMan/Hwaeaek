@@ -163,4 +163,33 @@ void main() {
     final summary = await validateTtf(done.file, expectCmap: 1 + 11223);
     expect(summary['fontRevision'], 1.001);
   });
+
+  test('OQ-04 그린 영문·숫자만 들어가고 비례폭이며, 그리지 않은 글자는 제외 목록에 없다', () async {
+    InkStroke line(double x0, double y0, double x1, double y1) => InkStroke([
+      for (var i = 0; i <= 20; i++)
+        InkPoint(x0 + (x1 - x0) * i / 20, y0 + (y1 - y0) * i / 20),
+    ]);
+    await t.glyphs.saveBaseGlyph(p, 'A', [line(200, 0, 400, 680), line(400, 680, 600, 0)]);
+    await t.glyphs.saveBaseGlyph(p, '1', [line(500, 0, 500, 680)]);
+    final ready = await buildToSheet();
+    expect(ready.build.excluded, isEmpty);
+    await job().deliver(ExportTarget.save);
+    final done = c.read(exportJobProvider(p)) as ExportDone;
+    final info = readTtf(await done.file.readAsBytes());
+    expect(info.cmap.length, 1 + 11223 + 2);
+    expect(info.cmap.containsKey('B'.runes.first), isFalse);
+    if (!toolsAvailable()) return;
+    await validateTtf(done.file, expectCmap: 1 + 11223 + 2);
+    final widths = await Process.run(pythonTool.path, [
+      '-I',
+      '-c',
+      'import sys;from fontTools.ttLib import TTFont;f=TTFont(sys.argv[1]);'
+          'c=f.getBestCmap();print(f["hmtx"][c[65]][0],f["hmtx"][c[49]][0],f["hmtx"][c[0xAC00]][0])',
+      done.file.path,
+    ]);
+    final [a, one, ga] = (widths.stdout as String).trim().split(' ').map(int.parse).toList();
+    expect(ga, 1000);
+    expect(a, greaterThan(one)); // A가 1보다 넓다
+    expect(one, lessThan(400));
+  });
 }

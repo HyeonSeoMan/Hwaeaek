@@ -8,6 +8,7 @@ import 'dart:math' as math;
 
 import '../font/metrics.dart';
 import '../glyph/glyph.dart';
+import '../glyph/latin_set.dart';
 import '../hangul/hangul.dart';
 import '../ink/ink.dart';
 
@@ -128,6 +129,7 @@ class HangulComposer {
   /// 구성 자음 키를 둘 다 넣는다.
   static Set<String> dependencies(int cp) {
     if (Syllable.isCompatJamo(cp)) return _jamoKeys(String.fromCharCode(cp));
+    if (isLatinGlyph(cp)) return {String.fromCharCode(cp)};
     if (!Syllable.isSyllable(cp)) return const {};
     final s = Syllable.decompose(cp);
     return {
@@ -158,6 +160,11 @@ class HangulComposer {
       // 단독 자모는 기본 글리프 획을 변환 없이 기본 펜으로 입힌다.
       if (strokes != null) return _ink(strokes, PenStyle.base);
       return _place(j, _fullSlot, padding: 0);
+    }
+    if (isLatinGlyph(cp)) {
+      // 숫자·문장부호·영문은 조합하지 않고 그린 획을 그대로 쓴다(왼쪽 여백 정렬).
+      final strokes = baseStrokes[String.fromCharCode(cp)];
+      return strokes == null ? null : alignLatin(_ink(strokes, PenStyle.base));
     }
     if (!Syllable.isSyllable(cp)) return null;
 

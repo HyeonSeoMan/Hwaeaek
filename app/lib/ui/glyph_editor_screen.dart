@@ -10,6 +10,7 @@ import 'package:material_ui/material_ui.dart';
 import '../domain/compose/composer.dart';
 import '../domain/font/metrics.dart';
 import '../domain/glyph/glyph.dart';
+import '../domain/glyph/latin_set.dart';
 import '../domain/ink/hws1.dart';
 import '../domain/ink/ink.dart';
 import '../domain/ink/quantize.dart';
@@ -423,6 +424,7 @@ class _GlyphEditorScreenState extends ConsumerState<GlyphEditorScreen> {
 }
 
 /// 글자 몸 상자(캔버스 테두리), 기준선, 조합 영역, 배치 영역 (Spec §5).
+/// 영문·숫자는 조합 영역 대신 대문자·소문자 높이와 내림 선.
 class _GuidePainter extends CustomPainter {
   _GuidePainter(this.colors, this.jamo);
 
@@ -446,6 +448,21 @@ class _GuidePainter extends CustomPainter {
     canvas.drawRect(Offset.zero & size, line);
     // 기준선
     canvas.drawLine(Offset(0, y(0)), Offset(size.width, y(0)), line);
+    final j = jamo;
+    if (j != null && isLatinGlyph(j.runes.first)) {
+      // 영문·숫자: 대문자 높이, 소문자 높이, 내림 선 (조합 영역 없음).
+      final guide = Paint()
+        ..color = colors.primary.withValues(alpha: 0.35)
+        ..strokeWidth = 1;
+      for (final fy in [
+        LatinGuides.capHeight,
+        LatinGuides.xHeight,
+        LatinGuides.descender,
+      ]) {
+        canvas.drawLine(Offset(0, y(fy)), Offset(size.width, y(fy)), guide);
+      }
+      return;
+    }
     // 조합 영역 (보조선)
     final area = Rect.fromLTRB(
       x(CompositionArea.left),
@@ -458,7 +475,6 @@ class _GuidePainter extends CustomPainter {
       line..color = colors.outlineVariant.withValues(alpha: 0.5),
     );
     // 배치 영역
-    final j = jamo;
     if (j != null) {
       final slot = HangulComposer.guideSlotFor(j);
       final w = area.width, h = area.height;

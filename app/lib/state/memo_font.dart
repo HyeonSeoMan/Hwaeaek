@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/font/metrics.dart';
 import '../domain/font/ttf_writer.dart';
+import '../domain/glyph/latin_set.dart';
 import '../domain/hangul/hangul.dart';
 import '../infra/platform/dynamic_font.dart';
 import 'snapshot.dart';
@@ -74,7 +75,8 @@ class MemoFontNotifier extends Notifier<MemoFontState> {
 
   static Set<int> _needed(String text) => {
     for (final r in text.runes)
-      if (Syllable.isSyllable(r) || Syllable.isCompatJamo(r)) r,
+      if (Syllable.isSyllable(r) || Syllable.isCompatJamo(r) || isLatinGlyph(r))
+        r,
   };
 
   void _schedule() {
@@ -98,7 +100,12 @@ class MemoFontNotifier extends Notifier<MemoFontState> {
         final glyphs = <int, FontGlyph>{};
         for (final cp in want) {
           final g = renderer.outline(cp);
-          if (g != null) glyphs[cp] = FontGlyph(g, FontMetrics.hangulAdvance);
+          if (g != null) {
+            glyphs[cp] = FontGlyph(
+              g,
+              advanceFor(cp, g, hangulAdvance: FontMetrics.hangulAdvance),
+            );
+          }
         }
         final bytes = buildTtf(
           FontSpec(

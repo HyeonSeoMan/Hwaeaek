@@ -4,6 +4,7 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../domain/glyph/latin_set.dart';
 import '../domain/hangul/base_set.dart';
 import '../infra/db/glyph_dao.dart';
 import '../state/glyph_actions.dart';
@@ -25,7 +26,9 @@ class BaseGlyphScreen extends ConsumerWidget {
         builder: (_) => GlyphEditorScreen(
           GlyphEditorArgs(
             projectId: projectId,
-            title: '기본 글리프 ‘$jamo’',
+            title: isLatinGlyph(jamo.runes.first)
+                ? '‘$jamo’ 그리기'
+                : '기본 글리프 ‘$jamo’',
             draftKind: DraftKind.base,
             draftKey: jamo,
             guideJamo: jamo,
@@ -167,9 +170,38 @@ class BaseGlyphScreen extends ConsumerWidget {
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+            padding: const EdgeInsets.all(16),
             sliver: grid(supplementaryBaseGlyphs(version), isRequired: false),
           ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            sliver: SliverToBoxAdapter(
+              child: Text(
+                '숫자·문장부호·영문 (선택) — 그린 글자만 폰트에 들어갑니다',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+            ),
+          ),
+          for (final (i, (title, chars)) in latinGroups.indexed) ...[
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              sliver: SliverToBoxAdapter(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                8,
+                16,
+                i == latinGroups.length - 1 ? 96 : 8,
+              ),
+              sliver: grid(chars, isRequired: false),
+            ),
+          ],
         ],
       ),
     );
