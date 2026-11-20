@@ -86,14 +86,14 @@ cd app
 flutter analyze
 flutter test                                   # 단위·위젯 테스트
 HWAEAEK_REQUIRE_TOOLS=1 flutter test           # 검증 도구가 없으면 건너뛰지 않고 실패
-flutter test integration_test -d macos         # 실제 앱 흐름: 기본 글리프 → 메모 → 다시 그리기 → 내보내기
+flutter test integration_test -d macos         # 실제 앱 흐름(로컬 전용, 실행 중 앱 창이 앞에 있어야 함)
 ../tools/check_dev_imports.sh                  # lib/dev/를 릴리스 코드에서 가져오지 않는지
 ```
 
 - 테스트 이름에 PRD 테스트 시나리오 ID(`TS-01` 등)가 들어 있습니다.
-- 조합 규칙 결과는 `app/test/golden/compose_v1.sha256`에 고정되어 있습니다. 조합 결과를 바꾸는 변경은 `HangulComposer.ruleVersion`을 올리고 골든을 갱신해야 합니다(`flutter test --update-goldens`).
+- 조합 규칙 결과는 `app/test/golden/compose_v2.sha256`에 고정되어 있습니다. 조합 결과를 바꾸는 변경은 `HangulComposer.ruleVersion`을 올리고 골든을 갱신해야 합니다(`flutter test --update-goldens`).
 - DB 스키마를 바꾸면 `drift_schemas/`에 새 덤프를 추가합니다(`dart run drift_dev schema dump lib/infra/db/database.dart drift_schemas/`).
-- CI(`.github/workflows/ci.yml`)는 macOS에서 분석·dev import 검사·전체 테스트를 실행합니다.
+- CI(`.github/workflows/ci.yml`)는 macOS에서 분석·dev import 검사·전체 단위·위젯 테스트를 실행합니다. 통합 테스트는 앱 창이 앞에 있어야 화면이 갱신되므로 CI에서 돌리지 않고 로컬에서 실행합니다.
 
 ## 문서
 

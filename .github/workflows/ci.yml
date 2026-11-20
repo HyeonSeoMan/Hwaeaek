@@ -1,9 +1,14 @@
 # Spec §12: 분석, 단위·위젯 테스트(OTS·fontTools 검증 포함), dev import 검사.
+# macOS 통합 테스트는 앱 창이 앞에 있어야 화면 갱신이 와서 CI에서 돌리지 않는다(로컬 실행).
 name: ci
 
 on:
   push:
   pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -12,7 +17,7 @@ jobs:
       run:
         working-directory: app
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: subosito/flutter-action@v2
         with:

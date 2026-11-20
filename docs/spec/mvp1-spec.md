@@ -782,7 +782,7 @@ Riverpod 3, 코드 생성 없이 `Provider`/`NotifierProvider`/`StreamProvider`�
 | 위젯 | `flutter test` | 문맥 메뉴, 편집 후 복귀 위치, 실행 취소 스낵바, 대체 표시, 조합 중 정규화 미적용 | TS-09, TS-10, TS-11, TS-19 | 4 |
 | 내보내기 | `flutter test` + `tools/validate_ttf.py` | cmap·numGlyphs 식, 버전 증가, 실패 시 버전 유지, 강제 종료 시 데이터 불변 | TS-03, TS-08, TS-13, TS-14 | 5 |
 | 백업 | `flutter test` | 왕복, 손상·악성 파일 픽스처(압축 폭탄, `..` 경로, 범위 밖 좌표, 새 버전) | TS-17, TS-18 | 6 |
-| 통합 | `integration_test` (iPad 시뮬레이터) | 작성 → 메모 → 다시 그리기 → 내보내기 | — | 5 |
+| 통합 | `integration_test` (macOS, 로컬 전용) | 작성 → 메모 → 다시 그리기 → 내보내기. 앱 창이 앞에 있어야 화면 갱신이 오므로 CI에서 돌리지 않는다. 같은 흐름은 위젯·상태 테스트(TS-03, TS-10)가 CI에서 검증한다 | — | 5 |
 | 수동 | — | 외부 프로그램 설치·사용 | TS-M1~TS-M4 | 5, 8 |
 
 - CI는 `.venv-tools`(fonttools, opentype-sanitizer, pillow)를 만들고 `HWAEAEK_REQUIRE_TOOLS=1`을 설정한다. 이 값이 있으면 외부 검증 도구가 없을 때 테스트가 건너뛰지 않고 실패한다. 테스트는 작업 디렉터리 `app/`에서 실행한다.
