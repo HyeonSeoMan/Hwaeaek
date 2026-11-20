@@ -13,10 +13,19 @@ import 'metrics.dart';
 import 'naming.dart';
 
 class FontGlyph {
-  const FontGlyph(this.outline, this.advanceWidth);
+  const FontGlyph(this.outline, this.advanceWidth) : parts = null;
+
+  /// 부품 참조 글리프(composite). [outline]은 부품을 합친 윤곽선으로, 메트릭
+  /// 계산에만 쓴다. [parts]는 [FontSpec.parts]의 인덱스이며 오프셋 0으로 놓는다.
+  const FontGlyph.composite(
+    this.outline,
+    this.advanceWidth,
+    List<int> this.parts,
+  );
 
   final GlyphOutline outline;
   final int advanceWidth;
+  final List<int>? parts;
 }
 
 class FontSpec {
@@ -28,6 +37,7 @@ class FontSpec {
     this.versionMajor = 1,
     this.versionMinor = 0,
     required this.created,
+    this.parts = const [],
     this.unitsPerEm = FontMetrics.unitsPerEm,
     this.ascender = FontMetrics.ascender,
     this.descender = FontMetrics.descender,
@@ -54,6 +64,9 @@ class FontSpec {
 
   /// 코드포인트 → 글리프. 공백(U+0020)이 없으면 자동으로 추가한다.
   final Map<int, FontGlyph> glyphs;
+
+  /// cmap에 없는 부품 글리프. 부품 참조 글리프가 인덱스로 가리킨다.
+  final List<GlyphOutline> parts;
   final FontGlyph notdef;
 
   /// head.created/modified. 내보내기는 내보내기 시각, 메모 폰트는
@@ -102,7 +115,12 @@ class _TtfBuilder {
         throw ArgumentError('BMP 밖 코드포인트는 지원하지 않는다: $cp');
       }
     }
-    glyphs = [spec.notdef, for (final cp in codePoints) map[cp]!];
+    glyphs = [
+      spec.notdef,
+      for (final cp in codePoints) map[cp]!,
+      for (final part in spec.parts) FontGlyph(part, 0),
+    ];
+    partBase = 1 + codePoints.length;
   }
 
   final FontSpec spec;
@@ -111,8 +129,11 @@ class _TtfBuilder {
   /// 글리프 순서: 0 = .notdef, 이후 코드포인트 오름차순.
   late final List<FontGlyph> glyphs;
 
+  /// 첫 부품 글리프의 ID.
+  late final int partBase;
+
   Uint8List build() {
-    final glyf = _GlyfData.encode(glyphs);
+    final glyf = _GlyfData.encode(glyphs, partBase);
     final tables = <String, Uint8List>{
       'OS/2': _os2(),
       'cmap': _cmap(),
@@ -205,26 +226,36 @@ class _TtfBuilder {
 
   Uint8List _maxp() {
     var maxPoints = 0, maxContours = 0;
+    var maxCompositePoints = 0, maxCompositeContours = 0, maxComponents = 0;
     for (final g in glyphs) {
-      maxPoints = math.max(maxPoints, g.outline.pointCount);
-      maxContours = math.max(maxContours, g.outline.contours.length);
+      if (g.parts case final parts?) {
+        maxCompositePoints = math.max(maxCompositePoints, g.outline.pointCount);
+        maxCompositeContours = math.max(
+          maxCompositeContours,
+          g.outline.contours.length,
+        );
+        maxComponents = math.max(maxComponents, parts.length);
+      } else {
+        maxPoints = math.max(maxPoints, g.outline.pointCount);
+        maxContours = math.max(maxContours, g.outline.contours.length);
+      }
     }
     final w = _Writer()
       ..u32(0x00010000)
       ..u16(glyphs.length)
       ..u16(maxPoints)
       ..u16(maxContours)
-      ..u16(0)
-      ..u16(0)
+      ..u16(maxCompositePoints)
+      ..u16(maxCompositeContours)
       ..u16(2) // maxZones
-      ..u16(0)
-      ..u16(0)
-      ..u16(0)
-      ..u16(0)
-      ..u16(0)
-      ..u16(0)
-      ..u16(0)
-      ..u16(0);
+      ..u16(0) // maxTwilightPoints
+      ..u16(0) // maxStorage
+      ..u16(0) // maxFunctionDefs
+      ..u16(0) // maxInstructionDefs
+      ..u16(0) // maxStackElements
+      ..u16(0) // maxSizeOfInstructions
+      ..u16(maxComponents)
+      ..u16(maxComponents == 0 ? 0 : 1); // maxComponentDepth
     return w.bytes;
   }
 
@@ -444,12 +475,17 @@ class _GlyfData {
   final Uint8List loca;
   final int indexToLocFormat;
 
-  static _GlyfData encode(List<FontGlyph> glyphs) {
+  static _GlyfData encode(List<FontGlyph> glyphs, int partBase) {
     final glyf = _Writer();
     final offsets = <int>[];
     for (final g in glyphs) {
       offsets.add(glyf.length);
-      if (!g.outline.isEmpty) {
+      if (g.parts case final parts?) {
+        glyf.raw(
+          _compositeGlyph(g.outline, [for (final p in parts) partBase + p]),
+        );
+        glyf.pad4();
+      } else if (!g.outline.isEmpty) {
         glyf.raw(_simpleGlyph(g.outline));
         glyf.pad4();
       }
@@ -471,6 +507,33 @@ class _GlyfData {
   static const _xSameOrPositive = 0x10;
   static const _ySameOrPositive = 0x20;
   static const _overlapSimple = 0x40;
+
+  static const _argsAreXyValues = 0x0002;
+  static const _moreComponents = 0x0020;
+  static const _overlapCompound = 0x0400;
+
+  /// 부품을 오프셋 0으로 겹쳐 놓는 composite 글리프.
+  static Uint8List _compositeGlyph(GlyphOutline merged, List<int> glyphIds) {
+    final b = merged.bounds!;
+    final w = _Writer()
+      ..i16(-1)
+      ..i16(b.xMin)
+      ..i16(b.yMin)
+      ..i16(b.xMax)
+      ..i16(b.yMax);
+    for (final (i, id) in glyphIds.indexed) {
+      var flags = _argsAreXyValues;
+      if (i < glyphIds.length - 1) flags |= _moreComponents;
+      // 부품끼리 겹치므로 렌더러에 알린다.
+      if (i == 0) flags |= _overlapCompound;
+      w
+        ..u16(flags)
+        ..u16(id)
+        ..u8(0)
+        ..u8(0);
+    }
+    return w.bytes;
+  }
 
   static Uint8List _simpleGlyph(GlyphOutline outline) {
     final contours = outline.contours.where((c) => c.isNotEmpty).toList();

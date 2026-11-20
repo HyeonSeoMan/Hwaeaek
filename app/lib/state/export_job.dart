@@ -131,7 +131,7 @@ class ExportJob extends Notifier<ExportState> {
     final part = File('${file.path}.part');
     try {
       await part.writeAsBytes(ready.build.bytes, flush: true);
-      verifyExport(await part.readAsBytes(), ready.build.validCount);
+      verifyExport(await part.readAsBytes(), ready.build);
       await ref
           .read(projectDaoProvider)
           .commitFontVersion(projectId, ready.build.versionMinor);

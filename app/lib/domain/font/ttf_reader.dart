@@ -21,8 +21,10 @@ class TtfInfo {
   /// cmap (3,1) format 4의 코드포인트 → 글리프 ID. 0xFFFF 끝 세그먼트는 뺀다.
   late final Map<int, int> cmap = _readCmap();
 
-  /// 단순 글리프 하나를 윤곽선으로 읽는다. 빈 글리프는 [GlyphOutline.empty].
-  GlyphOutline glyph(int glyphId) {
+  /// 글리프 하나를 윤곽선으로 읽는다. composite는 부품을 오프셋만큼 옮겨 펼친다.
+  /// 빈 글리프는 [GlyphOutline.empty].
+  GlyphOutline glyph(int glyphId, {int depth = 0}) {
+    if (depth > 4) throw const DecodeError('composite depth');
     final head = _table('head').offset;
     final longLoca = _data.getInt16(head + 50) == 1;
     final loca = _table('loca').offset;
@@ -34,7 +36,7 @@ class TtfInfo {
     if (start == end) return GlyphOutline.empty;
     var o = glyf + start;
     final contourCount = _data.getInt16(o);
-    if (contourCount < 0) throw const DecodeError('composite glyph');
+    if (contourCount < 0) return _composite(o + 10, depth);
     o += 10;
     final ends = [
       for (var i = 0; i < contourCount; i++) _data.getUint16(o + i * 2),
@@ -79,6 +81,37 @@ class TtfInfo {
           GlyphPoint(xs[i], ys[i], onCurve: flags[i] & 1 != 0),
       ]);
       s = e + 1;
+    }
+    return GlyphOutline(contours);
+  }
+
+  /// composite 부품 목록(오프셋만 지원, 확대·축소 없음)을 펼친다.
+  GlyphOutline _composite(int o, int depth) {
+    final contours = <Contour>[];
+    while (true) {
+      final flags = _data.getUint16(o);
+      final id = _data.getUint16(o + 2);
+      o += 4;
+      int dx, dy;
+      if (flags & 0x0001 != 0) {
+        dx = _data.getInt16(o);
+        dy = _data.getInt16(o + 2);
+        o += 4;
+      } else {
+        dx = _data.getInt8(o);
+        dy = _data.getInt8(o + 1);
+        o += 2;
+      }
+      if (flags & 0x0002 == 0) {
+        throw const DecodeError('point-matched component');
+      }
+      if (flags & (0x0008 | 0x0040 | 0x0080) != 0) {
+        throw const DecodeError('scaled component');
+      }
+      contours.addAll(
+        glyph(id, depth: depth + 1).transformed(dx: dx, dy: dy).contours,
+      );
+      if (flags & 0x0020 == 0) break;
     }
     return GlyphOutline(contours);
   }

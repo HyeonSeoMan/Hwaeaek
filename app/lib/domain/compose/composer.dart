@@ -90,6 +90,15 @@ const _fullSlot = Slot(0, 0, 1, 1);
 /// 조합 펜 기준 반지름(Spec §6.2 6단계). 펜 지름이 줄어도 자리 계산은 이 값을 쓴다.
 const _fitInset = 28.0;
 
+/// 음절을 이루는 부품: 자리에 맞춰 놓은 자모 하나의 윤곽선. 같은 [key]는 항상 같은
+/// 윤곽선이므로, TTF에서는 부품을 한 번만 넣고 음절이 참조한다(composite glyph).
+class GlyphPart {
+  const GlyphPart(this.key, this.outline);
+
+  final String key;
+  final GlyphOutline outline;
+}
+
 /// 자모 하나가 조합 오류임을 알리는 내부 신호.
 class _ComposeError implements Exception {
   const _ComposeError();
@@ -98,11 +107,34 @@ class _ComposeError implements Exception {
 class HangulComposer {
   HangulComposer(this.baseStrokes, {this.params = const RuleV1Params()});
 
-  static const ruleVersion = 1;
+  /// v1: 직선 다각형 윤곽. v2: 2차 곡선 맞춤(허용 오차 2).
+  static const ruleVersion = 2;
 
   /// 역할 키(MVP: 호환 자모 1자) → 기본 글리프 획.
   final Map<String, List<InkStroke>> baseStrokes;
   final RuleV1Params params;
+
+  /// 부품 키 → 윤곽선. 같은 자모·같은 자리는 여러 음절이 공유한다.
+  final _parts = <String, GlyphOutline>{};
+
+  /// 음절의 부품(초성 → 중성 → 종성, 겹자음은 왼쪽 → 오른쪽). 조합 오류면 null.
+  /// 음절이 아니면 null.
+  List<GlyphPart>? composeParts(int cp) {
+    if (!Syllable.isSyllable(cp)) return null;
+    try {
+      final parts = _syllableParts(cp);
+      if (parts == null) return null;
+      var points = 0;
+      for (final part in parts) {
+        points += part.outline.pointCount;
+      }
+      return points > 0xFFFF ? null : parts;
+    } on _ComposeError {
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// 음절 11,172자 + 호환 자모 51자의 윤곽선. 조합 오류면 null (Spec §6.2 오류 판정).
   /// 글자 하나를 계산하다 생긴 예외는 null로 바꾼다.
@@ -166,6 +198,13 @@ class HangulComposer {
       final strokes = baseStrokes[String.fromCharCode(cp)];
       return strokes == null ? null : alignLatin(_ink(strokes, PenStyle.base));
     }
+    final parts = _syllableParts(cp);
+    return parts == null
+        ? null
+        : GlyphOutline([for (final p in parts) ...p.outline.contours]);
+  }
+
+  List<GlyphPart>? _syllableParts(int cp) {
     if (!Syllable.isSyllable(cp)) return null;
 
     final s = Syllable.decompose(cp);
@@ -177,32 +216,46 @@ class HangulComposer {
       layout = _raiseTail(layout, params.compoundTailRaise);
     }
     // 컨투어 순서: 초성 → 중성 → 종성 (Spec §6.2 7단계).
-    final lead = _place(s.lead, layout.lead);
-    final vowel = _place(s.vowel, layout.vowel);
-    final tail = s.hasTail ? _place(s.tail, layout.tail!) : GlyphOutline.empty;
+    final lead = _placeParts(s.lead, layout.lead);
+    final vowel = _placeParts(s.vowel, layout.vowel);
+    final tail = s.hasTail
+        ? _placeParts(s.tail, layout.tail!)
+        : const <GlyphPart>[];
     if (lead == null || vowel == null || tail == null) return null;
-    return GlyphOutline([
-      ...lead.contours,
-      ...vowel.contours,
-      ...tail.contours,
-    ]);
+    return [...lead, ...vowel, ...tail];
   }
 
-  /// 자모 [j]를 [slot]에 넣은 윤곽선. 기본 글리프가 없으면 겹자음은 구성 자음을
-  /// 왼쪽 → 오른쪽으로 나란히 넣고, 그 외에는 null.
+  /// 자모 [j]를 [slot]에 넣은 윤곽선(단독 겹자음용).
   GlyphOutline? _place(String j, Slot slot, {double? padding}) {
+    final parts = _placeParts(j, slot, padding: padding);
+    return parts == null
+        ? null
+        : GlyphOutline([for (final p in parts) ...p.outline.contours]);
+  }
+
+  /// 자모 [j]를 [slot]에 넣은 부품들. 기본 글리프가 없으면 겹자음은 구성 자음을
+  /// 왼쪽 → 오른쪽으로 나란히 넣고, 그 외에는 null.
+  List<GlyphPart>? _placeParts(String j, Slot slot, {double? padding}) {
     final p = padding ?? params.slotPadding;
     final inner = Slot(slot.x0 + p, slot.y0 + p, slot.x1 - p, slot.y1 - p);
     final strokes = baseStrokes[j];
-    if (strokes != null) return _put(strokes, inner);
+    if (strokes != null) return [_part(j, strokes, inner)];
     final pair = compoundConsonants[j];
     if (pair == null) return null;
     final a = baseStrokes[pair.$1], b = baseStrokes[pair.$2];
     if (a == null || b == null) return null;
-    return GlyphOutline([
-      ..._put(a, _sub(inner, _compoundLeft)).contours,
-      ..._put(b, _sub(inner, _compoundRight)).contours,
-    ]);
+    return [
+      _part(pair.$1, a, _sub(inner, _compoundLeft)),
+      _part(pair.$2, b, _sub(inner, _compoundRight)),
+    ];
+  }
+
+  /// 같은 자모·같은 자리의 부품은 한 번만 계산한다.
+  GlyphPart _part(String jamo, List<InkStroke> strokes, Slot slot) {
+    final key =
+        '$jamo@${slot.x0.toStringAsFixed(5)},${slot.y0.toStringAsFixed(5)},'
+        '${slot.x1.toStringAsFixed(5)},${slot.y1.toStringAsFixed(5)}';
+    return GlyphPart(key, _parts[key] ??= _put(strokes, slot));
   }
 
   /// 획을 자리에 맞춰 옮기고 축소율에 맞는 펜으로 입힌다. 결과가 비면 조합 오류.

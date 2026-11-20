@@ -4,6 +4,7 @@ library;
 import 'dart:typed_data';
 
 import '../compose/composer.dart';
+import '../glyph/glyph.dart';
 import '../glyph/latin_set.dart';
 import '../hangul/hangul.dart';
 import '../project/snapshot.dart';
@@ -16,6 +17,7 @@ class ExportBuild {
     required this.bytes,
     required this.excluded,
     required this.validCount,
+    required this.partCount,
     required this.versionMinor,
   });
 
@@ -26,6 +28,9 @@ class ExportBuild {
 
   /// 유효 글리프가 있는 호환 자모 + 음절 + 영문·숫자 수.
   final int validCount;
+
+  /// cmap에 없는 부품 글리프 수.
+  final int partCount;
   final int versionMinor;
 }
 
@@ -51,8 +56,34 @@ ExportBuild buildExport(
   final composer = HangulComposer(snapshot.baseStrokes);
   final glyphs = <int, FontGlyph>{};
   final excluded = <int>[];
+  // 자동 생성 음절은 부품(자리에 놓인 자모)을 참조하는 composite로 넣는다.
+  // 같은 부품을 여러 음절이 공유하므로 파일이 크게 줄어든다(Spec §7.1).
+  final parts = <GlyphOutline>[];
+  final partIndex = <String, int>{};
   var done = 0;
   for (final cp in exportCodePoints()) {
+    final custom = snapshot.customs[cp];
+    if (Syllable.isSyllable(cp) &&
+        (custom == null || custom.selection == GlyphSelection.generated)) {
+      final composed = composer.composeParts(cp);
+      if (composed == null) {
+        excluded.add(cp);
+      } else {
+        glyphs[cp] = FontGlyph.composite(
+          GlyphOutline([for (final p in composed) ...p.outline.contours]),
+          FontMetrics.hangulAdvance,
+          [
+            for (final p in composed)
+              partIndex.putIfAbsent(p.key, () {
+                parts.add(p.outline);
+                return parts.length - 1;
+              }),
+          ],
+        );
+      }
+      if (++done % 500 == 0) onProgress?.call(done);
+      continue;
+    }
     final g = effectiveGlyph(snapshot, composer.compose, cp);
     // 커스텀 윤곽선도 TTF 한도를 넘으면 뺀다(Spec §7.2 4단계).
     if (g == null ||
@@ -87,25 +118,28 @@ ExportBuild buildExport(
       license: m.license,
       created: created,
       glyphs: glyphs,
+      parts: parts,
     ),
   );
   return ExportBuild(
     bytes: bytes,
     excluded: excluded,
     validCount: glyphs.length,
+    partCount: parts.length,
     versionMinor: versionMinor,
   );
 }
 
 /// 디스크에서 다시 읽은 바이트 검증 (Spec §7.2 8단계).
-/// cmap = 1(공백) + 유효 글리프, numGlyphs = cmap + 1(.notdef).
-void verifyExport(Uint8List bytes, int validCount) {
+/// cmap = 1(공백) + 유효 글리프, numGlyphs = cmap + 1(.notdef) + 부품 수.
+void verifyExport(Uint8List bytes, ExportBuild build) {
   final info = readTtf(bytes);
-  final cmap = 1 + validCount;
+  final cmap = 1 + build.validCount;
   if (info.cmap.length != cmap) {
     throw StateError('cmap ${info.cmap.length} != $cmap');
   }
-  if (info.numGlyphs != cmap + 1) {
-    throw StateError('numGlyphs ${info.numGlyphs} != ${cmap + 1}');
+  final numGlyphs = cmap + 1 + build.partCount;
+  if (info.numGlyphs != numGlyphs) {
+    throw StateError('numGlyphs ${info.numGlyphs} != $numGlyphs');
   }
 }
