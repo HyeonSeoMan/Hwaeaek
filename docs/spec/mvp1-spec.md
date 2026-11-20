@@ -1,6 +1,6 @@
 # 회애액 MVP 1.0 — 구현 명세 (Spec)
 
-> **문서 버전:** v0.3.0 (초안)  
+> **문서 버전:** v0.3.1 (초안)  
 > **최초 작성일:** 2026-11-19 · **최종 수정일:** 2026-11-19  
 > **기반 문서:** [PRD v0.4.2](../../hwaeaek-mvp1-prd-v0.4.2.md) · [기술 스택](../tech-stack.md) · [G0 PoC 기록](../poc/g0-log.md) · 리뷰: [v0.1.0](../reviews/spec-v0.1.0-egm-review.md), [v0.2.0](../reviews/spec-v0.2.0-egm-review.md)  
 > **상태:** G0 진행 중.
@@ -118,9 +118,9 @@ UI      app/lib/ui       화면, 위젯, 내비게이션
 
 펜 값:
 
-| 이름 | size | thinning | smoothing | streamline | easing | start (cap, taper, easing) | end (cap, taper, easing) | tolerance |
+| 이름 | size | thinning | smoothing | streamline | easing | start (cap, taper, easing) | end (cap, taper, easing) | tolerance / curveTolerance |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 기본 펜 | 56 | 0.55 | 0.6 | 0.5 | identity | true, 끔, easeInOut | true, 끔, easeOutCubic | 2 |
+| 기본 펜 | 56 | 0.55 | 0.6 | 0.5 | identity | true, 끔, easeInOut | true, 끔, easeOutCubic | 2 / 2 |
 | 조합 펜 | 56 × 배율(§6.2) | 기본 펜과 같음 | | | | | | |
 
 "taper 끔"은 `perfect_freehand`의 `taperEnabled: false`다. 편집 화면 표시, 커스텀 글리프 저장, 단독 호환 자모는 기본 펜을 쓴다. 그래서 그리는 모양과 저장되는 모양이 같다. 조합 펜은 자모가 줄어든 정도에 따라 기본 펜보다 가늘어지므로(약 28~56), 커스텀 음절은 자동 생성 음절의 가장 굵은 획과 같은 굵기다 `[Spec 결정]`. 펜 값은 실제 손글씨로 다시 맞춘다 `[G1 대기: OQ-01, OQ-02]`.
@@ -378,7 +378,7 @@ repeat contourCount:
 ### 5.1 획 → 윤곽선 (PoC 변경: 펜 옵션 명시)
 
 1. `perfect_freehand.getStroke`. `PenStyle`의 모든 필드(size, thinning, smoothing, streamline, easing, `StrokeEndOptions.start/end`의 cap·taperEnabled·easing)를 명시적으로 넘기고 `isComplete = true`. 패키지의 정적 기본값(`StrokeOptions.default*`, `StrokeEndOptions.default*`)에 기대지 않는다. `simulatePressure`는 획의 **모든** 점에 필압이 있을 때만 false다.
-2. Douglas–Peucker 단순화. 닫힌 다각형을 시작점에서 가장 먼 점으로 둘로 나눠 각각 단순화한다. `tolerance`가 0이면 생략한다.
+2. 2차 곡선 맞춤(규칙 v2, `curveTolerance` 2): 0.5 이하 오차로 거의 일직선인 점을 덜어 낸 뒤, 시작점부터 끝점 고정 2차 곡선을 최소제곱으로 맞추며 원래 점과 구간 중간점이 모두 `curveTolerance` 안에 드는 가장 긴 구간을 이분 탐색으로 고른다. 결과는 on-curve 끝점과 off-curve 제어점이 번갈아 나오는 컨투어다. `curveTolerance`가 0이면 규칙 v1처럼 Douglas–Peucker(닫힌 다각형을 시작점에서 가장 먼 점으로 둘로 나눠 각각 단순화, `tolerance`가 0이면 생략)로 직선 다각형을 만든다.
 3. 정수 반올림, 연속 중복 점 제거, 마지막 점이 첫 점과 같으면 제거, 점 3개 미만 컨투어 제거.
 4. 시계 방향(y 위)으로 맞춘다.
 
@@ -392,7 +392,7 @@ repeat contourCount:
 
 ```text
 HangulComposer(Map<String, List<InkStroke>> baseStrokes)   // 역할 키 → 획
-  static const ruleVersion = 1
+  static const ruleVersion = 2   // v1 직선 다각형, v2 2차 곡선 맞춤
   compose(int cp) -> GlyphOutline?       // 음절 11,172 + 호환 자모 51. 조합 오류면 null
   dependencies(int cp) -> Set<String>    // 이 글자 조합에 영향을 주는 역할 키
 ```
@@ -400,7 +400,9 @@ HangulComposer(Map<String, List<InkStroke>> baseStrokes)   // 역할 키 → 획
 - 입력은 기본 글리프 획이다(FR-04). PoC의 윤곽선 입력(규칙 v0)은 삭제했다(git 이력 `582ba4c`에 있음).
 - `dependencies(cp)`는 OQ-01 산출물("음절 → 의존 기본 글리프 집합 함수")이자 TS-01의 기대 집합 정의다. 겹자음 자리에는 그 겹자음 키와 구성 자음 키를 **둘 다** 넣는다(겹자음 기본 글리프가 생기면 레이아웃도 바뀌기 때문).
 
-### 6.2 규칙 v1 (PoC 변경: 컨투어 순서, 단독 자모 펜, 오류 판정, 퇴화 범위)
+### 6.2 규칙 v2 (PoC 변경: 컨투어 순서, 단독 자모 펜, 오류 판정, 퇴화 범위)
+
+규칙 v2는 v1과 배치·펜 계산이 같고, 윤곽선을 §5.1의 2차 곡선 맞춤으로 만드는 점만 다르다. 7단계 결과는 **부품** 단위로도 낸다(`composeParts`): 부품은 자리에 놓인 자모 하나(겹자음은 구성 자음 하나)의 윤곽선이고, 키는 `(자모, 안쪽 자리 좌표)`다. 같은 키는 항상 같은 윤곽선이므로 조합 엔진이 부품을 캐시하고, TTF는 부품을 composite로 공유한다(§7.1).
 
 PoC와 다른 점은 해시 골든과 TTF 바이트를 바꾸므로, 구현은 PoC가 아니라 이 절을 따른다.
 
@@ -498,17 +500,17 @@ PoC 동작을 유지하되 아래를 바꾼다(PoC 변경): `created`는 필수 
 | --- | --- |
 | `head` | version 1.0, fontRevision `1 + versionMinor/1000`, flags 0x000B, unitsPerEm 1000, created = modified = 내보내기 시각, 전체 bbox, macStyle 0, lowestRecPPEM 8, fontDirectionHint 2, indexToLocFormat 자동(마지막 오프셋 ≤ 0x1FFFE면 short), glyphDataFormat 0 |
 | `hhea` | ascender 800, descender -200, lineGap 0, advanceWidthMax·minLSB·minRSB·xMaxExtent 계산, caretSlopeRise 1, numberOfHMetrics = 글리프 수 |
-| `maxp` | v1.0, numGlyphs, maxPoints·maxContours 계산, maxZones 2, 나머지 0 |
+| `maxp` | v1.0, numGlyphs, maxPoints·maxContours(단순 글리프), maxCompositePoints·maxCompositeContours·maxComponentElements(composite), maxComponentDepth 1, maxZones 2, 나머지 0 |
 | `OS/2` | v4. xAvgCharWidth = 0이 아닌 advance 평균, usWeightClass 400, usWidthClass 5, fsType 0, ySubscript X/Y size·X/Y offset = 650/600/0/70, ySuperscript = 650/600/0/350, yStrikeoutSize 50, yStrikeoutPosition 300, sFamilyClass 0, panose 0, ulUnicodeRange bit 0(ASCII 있을 때)·52(호환 자모 있을 때)·56(음절 있을 때), achVendID `HWAE`, fsSelection 0xC0(REGULAR, USE_TYPO_METRICS), usFirst/LastCharIndex, typo 800/-200/0, usWinAscent = max(800, yMax), usWinDescent = max(200, -yMin), ulCodePageRange1 bit 19(음절 있을 때), sxHeight 500, sCapHeight 700, usDefaultChar 0, usBreakChar 0x20 `[G0 대기: OQ-10]` |
 | `cmap` | (0,3)과 (3,1)이 format 4 서브테이블 하나를 공유. 코드포인트와 글리프 ID가 함께 연속인 구간을 한 세그먼트로, 끝에 0xFFFF |
-| `glyf`/`loca` | 단순 글리프만. 첫 플래그에 OVERLAP_SIMPLE(0x40), 같은 플래그 반복 압축, 좌표는 short/same 플래그 사용 |
+| `glyf`/`loca` | 단순 글리프: 첫 플래그에 OVERLAP_SIMPLE(0x40), 같은 플래그 반복 압축, short/same 좌표 플래그. **자동 생성 음절은 composite**: 조합 엔진의 부품(자리에 놓인 자모 하나, §6.2)을 cmap 밖 글리프로 한 번만 넣고, 음절은 부품들을 ARGS_ARE_XY_VALUES·오프셋 0·배율 없음으로 참조한다. 첫 부품에 OVERLAP_COMPOUND(0x0400). 부품 글리프는 코드포인트 글리프 뒤에 둔다. 호환 자모·영문·커스텀 음절은 단순 글리프 |
 | `hmtx` | advance, lsb = xMin(빈 글리프는 0) |
 | `name` | 플랫폼 3·인코딩 1. en-US(0x0409): ID 0(라이선스가 있을 때), 1 = ASCII 이름, 2 = 스타일, 3 = `<PS 이름>;Version x.yyy`, 4 = ASCII 이름, 5 = `Version x.yyy`, 6 = PS 이름. ko-KR(0x0412): ID 1, 4 = 한글 이름(ASCII 이름과 다를 때). PS 이름 = `<ASCII 이름>-<스타일>`에서 ASCII 33~126 밖과 `[](){}<>/%`·공백을 지우고 63자로 자름 |
 | `post` | v3.0, underlinePosition -100, underlineThickness 50 |
 
 글리프 순서: `.notdef`(폭 500, 이중 사각형), 이후 코드포인트 오름차순(공백, 호환 자모, 음절). 공백은 항상 넣는다.
 
-`[G0 대기: OQ-03]` 파일 크기를 줄이기 위해 자모 composite 글리프(§17 대안)를 채택하면 "단순 글리프만", §7.3 리더, TS-12 비교 방법이 바뀐다.
+composite는 확대·축소가 없으므로 펼친 윤곽선이 단순 글리프로 넣었을 때와 같다(TS-12는 펼쳐서 비교). 외부 프로그램 표시는 TS-M1~3에서 확인한다.
 
 ### 7.2 내보내기 흐름
 
@@ -526,7 +528,7 @@ PoC 동작을 유지하되 아래를 바꾼다(PoC 변경): `created`는 필수 
  7. 고르면: exports/<projectId>/<asciiName>-v<n>.ttf.part에 쓴다.
  8. 디스크의 .part를 다시 읽어 §7.3으로 검증한다.
       cmap 항목 수 = 1(공백) + 유효 호환 자모 수 + 유효 음절 수
-      numGlyphs    = cmap 항목 수 + 1(.notdef)
+      numGlyphs    = cmap 항목 수 + 1(.notdef) + 부품 수
  9. DB: font_version_minor = n 커밋
 10. .part → .ttf 이름 바꾸기, 고른 동작 실행(§13)
 ```
@@ -539,13 +541,13 @@ PoC 동작을 유지하되 아래를 바꾼다(PoC 변경): `created`는 필수 
 
 ### 7.3 기기 안 검증 `[Spec 결정]`
 
-`app/lib/domain/font/ttf_reader.dart`는 테이블 디렉터리, 각 테이블 체크섬과 `head.checkSumAdjustment`, `maxp.numGlyphs`, `cmap` format 4 항목 수를 읽는다. 테스트용으로 `glyf` 단순 글리프 디코더를 함께 둔다(TS-12). OTS 수준 검증은 CI에서만 한다(§12). `fontations`의 읽기 기능을 쓰지 않는 이유는 §17.
+`app/lib/domain/font/ttf_reader.dart`는 테이블 디렉터리, 각 테이블 체크섬과 `head.checkSumAdjustment`, `maxp.numGlyphs`, `cmap` format 4 항목 수를 읽는다. 테스트용으로 `glyf` 디코더를 함께 둔다(단순 글리프, 오프셋만 있는 composite 펼치기, TS-12). OTS 수준 검증은 CI에서만 한다(§12). `fontations`의 읽기 기능을 쓰지 않는 이유는 §17.
 
 ### 7.4 버전 999 이후와 파일 정리
 
 - `font_version_minor`가 999면 내보내기 시트에서 "폰트 버전이 최대입니다. 폰트 이름을 바꾸면 버전이 1.001부터 다시 시작합니다"를 표시하고 진행하지 않는다. 폰트 이름(ASCII)을 바꾸면 `font_version_minor`를 0으로 되돌리며, 다음 내보내기가 1.001이 된다 `[Spec 결정]`.
 - `exports/`의 기준은 앱 문서 폴더(`getApplicationDocumentsDirectory`)다. `exports/<projectId>/`에는 최근 3개 파일만 남긴다(공유 시트가 파일을 읽는 동안 지워지지 않게 하면서 공간이 쌓이지 않게). 앱 시작 시 남은 `.part`를 지운다.
-- 파일 크기는 현재 약 7.4MB(획 픽스처)다 `[G0 대기: OQ-03]`.
+- 파일 크기는 획 픽스처 기준 0.51MB, 내보내기 0.19초(Mac)다(G0 4회차). 단순 글리프만 쓰던 규칙 v1은 7.39MB·1.5초였다.
 
 ## 8. 메모 렌더러 (동적 폰트)
 
@@ -770,7 +772,7 @@ Riverpod 3, 코드 생성 없이 `Provider`/`NotifierProvider`/`StreamProvider`�
 
 | 종류 | 도구 | 대상 | TS | 단계 |
 | --- | --- | --- | --- | --- |
-| 단위 | `flutter test` | 분해, 조합, `dependencies`, 점 하나 기본 글리프 → 조합 오류, HWS1/HWO1 왕복, 양자화 후 조합 동일, TTF 빌드·읽기, u16 초과 예외, 한글 정규화 벡터 | — | 1 |
+| 단위 | `flutter test` | 분해, 조합, `dependencies`, 점 하나 기본 글리프 → 조합 오류, HWS1/HWO1 왕복, 양자화 후 조합 동일, TTF 빌드·읽기, composite 펼침 = 조합 결과, u16 초과 예외, 한글 정규화 벡터 | — | 1 |
 | 해시 골든 | `flutter test` | §6.3 | TS-12 | 1 |
 | 불변식·회귀 | `flutter test` + 임시 파일 Drift DB | POL-01~03, POL-05~07. 트리거가 허용 경로 밖 수정본 삭제를 막음, `revision_guard` 행이 없어도 막음, 다른 모든 쓰기 후 `custom_revisions` 행 수가 줄지 않음, `glyph_revision` 증가 | TS-01, TS-04, TS-06, TS-07, TS-20 | 2 |
 | 재시작 | 임시 파일 DB 닫고 다시 열기 | | TS-02 | 2 |
@@ -849,7 +851,7 @@ Riverpod 3, 코드 생성 없이 `Provider`/`NotifierProvider`/`StreamProvider`�
 | OQ | 항목 | 바뀔 수 있는 곳 |
 | --- | --- | --- |
 | OQ-03 | 온디바이스 빌드 경로·기기 간 해시 차이 | §6.3 기록 (PRD FR-04는 이미 허용) |
-| OQ-03 | 파일 크기 → composite 채택 | §7.1 "단순 글리프만", §7.3 리더, §12 TS-12 비교 방법, §6.2 |
+| OQ-03 | ~~파일 크기~~ 해소(composite 채택, G0 4회차) | — |
 | OQ-08 | Apple Pencil 샘플링 | §5, `streamline` 변경 시 §3.1 펜 값과 `ruleVersion`(§6.3) |
 | OQ-09 | iOS 폰트 설치 | §13.1 전체, §7.2 6단계 설치 버튼, FR-08 안내 문구 |
 | OQ-10 | 메트릭·고정폭 | §2(저장 좌표의 의미 포함), §4.2, §6.2 조합 영역, §7.1 OS/2·win 값 |
@@ -891,7 +893,8 @@ Riverpod 3, 코드 생성 없이 `Provider`/`NotifierProvider`/`StreamProvider`�
 | 기기 안 TTF 검증 | 자체 최소 리더 | `fontations` 읽기: Android에 Rust 도구 필요(tech-stack.md) |
 | 겹침 처리 | OVERLAP_SIMPLE 플래그 | `clipper2` 합집합: 0.0.x 버전, 조합 시간 증가. TS-M1에서 Windows 렌더링에 겹침 자국이 보이면 재검토 |
 | 메모 폰트 범위 | 열린 메모 글자 | 모든 메모 글자: 편집마다 수천 자 재빌드. KS X 1001 미리 담기(PRD RISK-07 완화책): 2,350자 빌드·등록이 메모를 열 때마다 생겨 첫 표시가 늦어짐. P-2: §8.1 측정 기준을 넘으면 채택 |
-| 자동 생성 글리프 출력 | 단순 글리프 | P-1: 빌더·리더·검증 범위가 늘어남. iPad 내보내기 > 10초 또는 TTF > 10MB면 채택 `[G0 대기: OQ-03, OQ-13]` |
+| 자동 생성 글리프 출력 | composite(P-1 채택) | 단순 글리프: 7.39MB·1.5초로 모바일 공유에 부담. 꼭짓점 off-curve 변환: 크기 40% 감소에 오차 16단위. 곡선 맞춤만: 29% 감소에 그침 |
+| 윤곽 표현 | 2차 곡선 맞춤(허용 오차 2) | 직선 다각형: 같은 정확도에서 점이 25% 많고 큰 크기에서 각짐 |
 | 백업 형식 | ZIP + JSON + 바이너리 | P-3: 형식 정의는 줄지만 신뢰할 수 없는 SQLite 파싱 공격 면이 생김 |
 | 조합 작업 위치 | UI isolate(메모) + 내보내기 isolate | P-4: §8.1 측정 기준을 넘고 P-2로도 부족하면 |
 | 내보내기 중 백그라운드 | 계산을 버리지 않음 | iOS 백그라운드 작업으로 유예 후 폐기: 네이티브 코드가 늘고 결과 시트를 보던 중에도 버려짐 |
@@ -1004,3 +1007,4 @@ Riverpod 3, 코드 생성 없이 `Provider`/`NotifierProvider`/`StreamProvider`�
 | v0.1.0 | 2026-11-19 | 최초 초안. PRD v0.4.0과 G0 1~3회차 기반 |
 | v0.2.0 | 2026-11-19 | v0.1.0 EGM 리뷰 반영. 획 f32 양자화와 기울기 저장, 쓰기 큐와 "화면 기준 = 커밋된 DB", 비교 후 교체 실행 취소, 백업 형식 JSON 스키마와 스트리밍 가져오기 검증, `drafts` DDL, 복합 외래 키와 수정본 삭제 트리거, 내보내기 원자성, `ruleVersion` 정의와 해시 골든, 한글 정규화, 메모 폰트 revision 기준·열린 메모 범위, 손바닥 방지, Android 저장·가져오기, iOS 설치 경로, 대안·위험·PRD 반영·구현 단계·추적표. 10자 미리보기 삭제 |
 | v0.3.0 | 2026-11-19 | v0.2.0 EGM 리뷰 반영. 전역 쓰기 큐 대신 Drift 직렬화 + 대상별 대기 목록, 모든 쓰기 실패를 알리고 자동 재시도(FR-01), `glyph_revision`·`base_revision` 열, 쓰기 표 보완, `revision_guard` 한 행 강제, 입력 상한과 그에서 도출한 백업 상한·압축률 검사, 백업 이름 정규식·역할 키 16진 파일명·메모 id 규칙, 규칙 v1의 PoC 변경점(컨투어 순서, 단독 자모 펜, 오류 판정, 퇴화 범위) 명시, `PenStyle` easing, 편집 표시 펜 = 저장 펜 56, 양자화 위치, 해시 골든 정의, 내보내기 백그라운드 처리 단순화, 메모 폰트 전환 기준값, 단계별 파일·패키지 버전·도구 결정, PoC 파일 처리 |
+| v0.3.1 | 2026-11-20 | 자동 생성 음절을 부품 참조 composite로 출력(P-1 채택, 7.39MB → 0.51MB), 윤곽선 2차 곡선 맞춤과 규칙 v2, 영문·숫자 글리프(OQ-04, v0.4.2) |
