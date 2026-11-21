@@ -47,7 +47,7 @@ app/                    Flutter 앱
   drift_schemas/        DB 스키마 버전별 덤프
 tools/                  TTF 검증(OTS·fontTools), 샘플 렌더링, KS X 1001 목록 생성
 docs/                   기술 스택, 구현 명세, PoC 기록, 리뷰 보고서
-hwaeaek-mvp1-prd-v0.4.2.md  제품 요구사항
+hwaeaek-mvp1-prd-v0.5.0.md  제품 요구사항
 ```
 
 ## 개발 환경
@@ -99,7 +99,7 @@ flutter test integration_test -d macos         # 실제 앱 흐름(로컬 전용
 
 | 문서 | 내용 |
 | --- | --- |
-| [PRD v0.4.2](hwaeaek-mvp1-prd-v0.4.2.md) | 목표, 기능 요구사항(FR), 정책(POL), 미결정 사항(OQ), 위험, 테스트 시나리오(TS) |
+| [PRD v0.5.0](hwaeaek-mvp1-prd-v0.5.0.md) | 목표, 기능 요구사항(FR), 정책(POL), 미결정 사항(OQ), 위험, 테스트 시나리오(TS) |
 | [구현 명세](docs/spec/mvp1-spec.md) | 아키텍처, DB 스키마, 바이너리 형식, 조합 규칙 v1, TTF·내보내기, 백업, 구현 단계 |
 | [기술 스택](docs/tech-stack.md) | 선택한 기술과 대안 |
 | [G0 PoC 기록](docs/poc/g0-log.md) | PoC 측정값과 발견(획 단위 조합, 겹받침, 동적 폰트) |
